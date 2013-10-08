@@ -10,7 +10,7 @@
  * This curriculum leads nicely into digital electronics, with simple circuits like 7-segment displays.
  *
  * The core of these functions is a boolean expression. Literal values are True and False, or 1 and 0.
- *	Operations supported by this engine are AND, OR, NOT, NAND, NOR, XOR, and XNOR
+ *	Operations supported by this engine are AND, OR, NOT, NAND, NOR, XOR, and XNOR.
  *
  */
 
@@ -19,70 +19,114 @@ var ExpressionError = function(message){
 };
 ExpressionError.prototype.name = "ExpressionError";
 
-function AND(operands){
-	if(this.eval_flag) throw new ExpressionError("Loop in logical expression");
-	this.eval_flag = true;
-	for (var i = 0; i < operands.length; i++) {
-		if(!operands[i].evaluate()){
+/*********
+ ** AND **
+ *********/
+function AND(ops_array){
+	this.operands = ops_array;
+}
+
+AND.prototype.str = function(){
+	return $.map(this.operands, function(elem, index){
+		return elem.str();
+	}).join(" AND ");
+};
+
+AND.prototype.eval = function(){
+	for (var i = 0; i < this.operands.length; i++) {
+		if(!this.operands[i].eval()){
 			return false;
 		}
 	};
 	return true;
 };
 
-function OR(operands){
-	if(this.eval_flag) throw new ExpressionError("Loop in logical expression");
-	this.eval_flag = true;
-	for (var i = 0; i < operands.length; i++) {
-		if(operands[i].evaluate()){
+/*********
+ ** OR  **
+ *********/
+
+function OR(ops_array){
+	this.operands = ops_array;
+}
+
+OR.prototype.str = function(){
+	return "(" + $.map(this.operands, function(elem, index){
+		return elem.str();
+	}).join(" OR ") + ")";
+};
+
+OR.prototype.eval = function(){
+	for (var i = 0; i < this.operands.length; i++) {
+		if(this.operands[i].eval()){
 			return true;
 		}
 	};
 	return false;
 };
 
-function NOT(operands){
-	if(operands.length > 1) throw new ExpressionError("NOT cannot evaluate multiple arguments");
-	return !operands[0].evaluate();
+/*********
+ ** NOT **
+ *********/
+
+function NOT(op){
+	this.operands = op;
+}
+
+NOT.prototype.str = function(){
+	return "(" + op.str() + ")'";
 };
 
-function BooleanExpression(type, ops){
-	this.operands = ops;
-	this.operator = type;
-	this.eval_flag = false;
+NOT.prototype.eval = function(){
+	return !op.eval();
 };
 
-BooleanExpression.prototype.evaluate = function(){
-	switch(this.operator){
-		case "": // literal value
-		case "LITERAL":
-			return this.operands;
-			break;
-		case "AND":
-			return AND(this.operands);
-			break;
-		case "OR":
-			return OR(this.operands);
-			break;
-		case "NOT":
-			return NOT(this.operands);
-			break;
-	}
+/**************
+ ** LITERALS **
+ **************/
+
+var TRUE = {};
+TRUE.str = function(){
+	return "TRUE";
+};
+TRUE.eval = function(){
+	return true;
 };
 
-var x, y, z;
+var FALSE = {};
+FALSE.str = function(){
+	return "FALSE";
+};
+FALSE.eval = function(){
+	return false;
+};
+
+/***************
+ ** VARIABLES ** 
+ ***************/
+
+function VARIABLE(name, expr){
+	this.name = name;
+	this.value = expr; // note: it is OK if this remains undefined!
+}
+VARIABLE.prototype.str = function(){
+	return this.name;
+};
+VARIABLE.prototype.eval = function(){
+	if(typeof this.expr === "undefined") return undefined;
+	else return this.expr.eval();
+};
 
 // TESTS
 (function(){
-	x = new BooleanExpression("", true);
-	y = new BooleanExpression("", false);
-	z = new BooleanExpression("AND", [x, y]);
+	x = new VARIABLE("x");
+	y = new VARIABLE("y");
+	z = new AND([x, y]);
 
-	console.log(x);
-	console.log(y);
-	console.log(z);
+	console.log(z.str());
+	
+	console.log(z.eval());
 
-	console.log(x.evaluate());
-	console.log(y.evaluate());
-	console.log(z.evaluate());
+	x.value = TRUE;
+	y.value = TRUE;
+	console.log(z.eval());
 })();
