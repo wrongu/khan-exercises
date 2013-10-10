@@ -52,14 +52,14 @@ AND.prototype.TYPE = "OPERATOR";
 AND.prototype.NAME = "AND";
 
 AND.prototype.toString = function(){
-	return $.map(this.operands, function(evaled, index){
-		return evaled.toString();
+	return $.map(this.operands, function(elem, index){
+		return elem.toString();
 	}).join(" AND ");
 };
 
 AND.prototype.eval = function(){
-	var evaled = $.map(this.operands, function(evaled, ind){
-		return evaled.eval() || evaled;
+	var evaled = $.map(this.operands, function(elem, ind){
+		return elem.eval() || elem;
 	});
 	var literals = $.grep(evaled, isLiteral);
 	var symbols = $.grep(evaled, isNonLitereal);
@@ -195,6 +195,12 @@ ParserContext.prototype.test = function(word){
 		return false;
 	}
 }
+ParserContext.prototype.any = function(word_array){
+	for (var i = 0; i < word_array.length; i++) {
+		if(this.test(word_array[i])) return true;
+	};
+	return false;
+}
 ParserContext.prototype.match = function(word){
 	if(this.test(word)) return true;
 	else{
@@ -208,8 +214,8 @@ ParserContext.prototype.isNum = function(){
 };
 ParserContext.prototype.isAlpha = function(){
 	var c = this.str.charAt(this.ind);
-	return ('a' < c && c < 'z') ||
-		('A' < c && c < 'Z') ||
+	return ('a' <= c && c <= 'z') ||
+		('A' <= c && c <= 'Z') ||
 		c == '_';
 };
 // take whitespace
@@ -225,31 +231,67 @@ ParserContext.prototype.w = function(){
 
 var ExpressionParser = {
 
-	// THE TOP LEVEL
-	// parse full expression
-	expression: function(ctx){
-		// this line defines the order of operations
-		return this.parens(ctx) || 
-			this.not(ctx) || 
-			this.and(ctx) || 
-			this.or(ctx) || 
-			this.lit(ctx) || 
-			this.vari(ctx);
+	// This object defines the parsing tokens, precedence, constructors, etc
+	tokens: {
+		AND: {
+			symbols: ["AND", "*"],
+			precedence: 2,
+			ctor: AND,
+			type: "OPERATOR"
+		},
+		OR: {
+			symbols: ["OR", "+"],
+			precedence: 1,
+			ctor: OR,
+			type: "OPERATOR"
+		},
+		NOT: {
+			symbols: ["!", "~", "-"],
+			ctor: NOT,
+			type: "PRIMARY"
+		},
+		TRUE: {
+			symbols: ["TRUE", "T"],
+			ctor: function(){return TRUE;},
+			type: "LITERAL"
+		},
+		FALSE: {
+			symbols: ["FALSE", "F"],
+			ctor: function(){return FALSE;},
+			type: "LITERAL"
+		},
 	},
 
-	// anything not an operator ("unary", if you will)
-	term: function(ctx){
+	// anything not an operator
+	primary: function(ctx){
 		return this.parens(ctx) || 
-			this.lit(ctx) || 
-			this.vari(ctx);
+			this.lit(ctx) ||
+			this.vari(ctx) ||
+			this.not(ctx);
+	},
+
+	// parse an operator, leave ctx pointing to rhs
+	//	return: the standard name of the operator.
+	//	current options are AND, OR
+	operator: function(ctx){
+		var start = ctx.ind;
+		ctx.s();
+		for(var key in this.tokens){
+			if(this.tokens[key].type === "OPERATOR"){
+				if(ctx.any(this.tokens[key].symbols)){
+					return key;
+				}
+			}
+		}
+		return undefined;
 	},
 
 	// parse parenthesized expression and return it, or undefined if not there
 	parens: function(ctx){
-		ctx.s();
 		var start = ctx.ind;
+		ctx.s();
 		if(ctx.test("(")){
-			var content = expression(ctx);
+			var content = this.expression(ctx);
 			if(ctx.match(")")) return content;
 		}
 		// failed.. reset
@@ -259,20 +301,23 @@ var ExpressionParser = {
 
 	lit: function(ctx){
 		ctx.s();
-		if(ctx.test("TRUE") || ctx.test("T"))
-			return TRUE;
-		else if(ctx.test("FALSE") || ctx.test("F"))
-			return FALSE;
+		for(var key in this.tokens){
+			if(this.tokens[key].type == "LITERAL"){
+				if(ctx.any(this.tokens[key].symbols)){
+					return this.tokens[key].ctor();
+				}
+			}
+		}
 		return undefined;
 	},
 
 	// parse a variable name
 	// variables are required to be a single capital letter. T and F are reserved.
 	vari: function(ctx){
-		ctx.s();
 		var start = ctx.ind;
+		ctx.s();
 		var ch = ctx.next();
-		if('A' < ch && ch < 'Z' && ch != 'T' && ch != 'F')
+		if('A' <= ch && ch <= 'Z' && ch != 'T' && ch != 'F')
 			return new VARIABLE(ch);
 		ctx.set(start);
 		return undefined;
@@ -281,8 +326,8 @@ var ExpressionParser = {
 	not: function(ctx){
 		var start = ctx.ind;
 		ctx.s();
-		if(ctx.test("~") || ctx.test("!") || ctx.test("-")){
-			var content = this.term(ctx);
+		if(ctx.any(this.tokens["NOT"].symbols)){
+			var content = this.primary(ctx);
 			if(content) return new NOT(content);
 		}
 		// failed.. reset
@@ -290,36 +335,60 @@ var ExpressionParser = {
 		return undefined;
 	},
 
-	and: function(ctx){
+	lookeahead_precedence: function(ctx){
 		var start = ctx.ind;
-		var lhs = this.term(ctx);
-		if(lhs){
-			ctx.s();
-			if(ctx.test("x") || ctx.test("AND") || ctx.test("A") || ctx.test("*")){
-				ctx.s();
-				var rhs = this.term(ctx) || this.not(ctx);
-				if(rhs) return new AND(lhs, rhs);
-			}
-		}
-		// failed.. reset
+		ctx.s();
+		var op;
+		var prec = -1;
+		if(op = this.operator(ctx)) prec = this.tokens[op].precedence;
 		ctx.set(start);
-		return undefined;
+		return prec;
 	},
 
-	or: function(ctx){
-		var start = ctx.ind;
-		var lhs = this.term(ctx);
-		if(lhs){
-			ctx.s();
-			if(ctx.test("+") || ctx.test("OR") || ctx.test("O")){
-				ctx.s();
-				var rhs = this.expression(ctx);
-				if(rhs) return new OR(lhs, rhs);
+	expression: function(ctx){
+		var lhs = this.primary(ctx);
+		console.log("expr start:");
+		console.log(lhs);
+		return this.expression_helper(ctx, lhs, -1)
+	},
+
+	/* The main algorithm of an "Operator Precedence Parser"
+	 *
+	 * The idea is that an expression always follows the pattern
+	 * 		primary <operator> primary <operator> primary ... <operator> primary
+	 * That is, it alternates "primary" terms and operators. the first and last
+	 *	tokens are primaries.
+	 * This function works as follows:
+	 *
+	 * GIVEN:
+	 *   lhs: a primary token
+	 *   ctx: the parsing context, pointing to the operator to the right of 'lhs'
+	 *   min_prec: the precedence of the operator left of 'lhs'
+	 *
+	 * RETURNS: the right-hand-term for the expression preceding lhs
+	 *
+	 * EXAMPLE: we are parsing "A + B * C"
+	 * where lhs is "B", ctx is pointing to "*", and min_prec is 1 (the precedence of "+"),
+	 * this will return "(B * C)"
+	 *
+	 */
+	expression_helper: function(ctx, lhs, min_prec){
+		console.log("helper("+ctx.ind+", "+ lhs.NAME +", "+min_prec+")");
+		var next_precedence = this.lookeahead_precedence(ctx);
+		while(next_precedence > min_prec){
+			// the next operator has higher precedence.. so we need to fully process that one first
+			var op = this.operator(ctx);
+			console.log(op + " has greater precedence.. recursing");
+			var rhs = this.expression_helper(ctx, this.primary(ctx), next_precedence);
+			var ctor = this.tokens[op].ctor;
+			if(ctor){
+				console.log(ctor);
+				lhs = new ctor(lhs, rhs);
+				console.log(lhs);
 			}
+			next_precedence = this.lookeahead_precedence(ctx);
 		}
-		// failed.. reset
-		ctx.set(start);
-		return undefined;
+		return lhs;
 	},
 
 	// The function called externally
