@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <title>Positive and zero exponents</title>
-    <script src="../khan-exercise.js"></script>
+    <script data-main="../local-only/main.js" src="../local-only/require.js"></script>
 </head>
 <body>
     <div class="exercise">
@@ -25,13 +25,13 @@
                 <var id="FAKE_SOLUTION4">_(BASE).times(function() { return EXPONENT; }).join(" \\cdot ")</var>
             </div>
 
-            <p class="question"><code>\Large <var>BASE</var>^{<var>EXPONENT</var>} = \; ?</code></p>
+            <p class="question"><code>\Large{<var>BASE</var>^{<var>EXPONENT</var>} = {?}}</code></p>
             <div class="solution" data-forms="integer"><code><var>EXPANSION[0]</var></code></div>
             <ul class="choices" data-none="true" data-show="4">
                 <li><code><var>FAKE_SOLUTION1</var></code></li>
                 <li><code><var>FAKE_SOLUTION2</var></code></li>
                 <li><code><var>FAKE_SOLUTION3</var></code></li>
-                <li data-if="BASE > 0 && BASE < 7"><code><var>FAKE_SOLUTION4</var></code></li>
+                <li data-if="BASE > 0 && BASE < 7 && BASE * EXPONENT !== 8"><code><var>FAKE_SOLUTION4</var></code></li>
             </ul>
 
             <div class="hints">
@@ -45,12 +45,12 @@
         <div id="select-exponent">
             <div class="vars">
                 <var id="SOLUTION">BASE + "^{" + EXPONENT + "}"</var>
-                <var id="FAKE_SOLUTION1">EXPONENT + "^{" + BASE + "}"</var>
+                <var id="FAKE_SOLUTION1">BASE * EXPONENT === 8 ? BASE + " \\cdot " + EXPONENT : EXPONENT + "^{" + BASE + "}"</var>
                 <var id="FAKE_SOLUTION2">EXPONENT + "^{" + EXPONENT + "}"</var>
-                <var id="FAKE_SOLUTION3">BASE + "^{" + BASE + "}"</var>
+                <var id="FAKE_SOLUTION3">BASE === 1 || BASE === 0 ? EXPONENT : BASE + "^{" + BASE + "}"</var>
             </div>
 
-            <p class="question"><code>\Large <var>EXPANSION[0]</var> = \; ?</code></p>
+            <p class="question"><code>\Large{<var>EXPANSION[0]</var> = {?}}</code></p>
             <div class="solution" data-forms="integer"><code><var>SOLUTION</var></code></div>
             <ul class="choices" data-none="true" data-show="4">
                 <li><code><var>FAKE_SOLUTION1</var></code></li>
@@ -71,8 +71,8 @@
                 <var id="SOLUTION">round(pow(BASE, EXPONENT))</var>
             </div>
 
-            <p class="question"><code>\Large <var>BASE</var>^{<var>EXPONENT</var>} = \; ?</code></p>
-            <div class="solution" data-forms="integer"><code><var>SOLUTION</var></code></div>
+            <p class="question"><code>\Large{<var>BASE</var>^{<var>EXPONENT</var>} = {?}}</code></p>
+            <div class="solution" data-forms="integer"><var>SOLUTION</var></div>
             <div class="hints">
                 <div data-each="EXPANSION as v" data-unwrap="">
                     <p><code>= <var>v</var></code></p>

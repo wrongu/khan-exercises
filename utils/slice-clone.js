@@ -1,3 +1,9 @@
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, indent, max-len, no-undef, no-unused-vars, prefer-template */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
+define(function(require) {
+
 // Helper for fractions_cut_and_copy_1 and fractions_cut_and_copy_2
 $.extend(KhanUtil, {
     initSliceClone: function(goalBlocks) {
@@ -48,4 +54,6 @@ $.extend(KhanUtil, {
             $("#" + id + "_answer input").val(KhanUtil.roundTo(3, times / pieces));
         });
     }
+});
+
 });

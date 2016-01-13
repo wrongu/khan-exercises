@@ -1,4 +1,10 @@
-(function(KhanUtil) {
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, comma-spacing, indent, max-len, no-undef, no-unused-vars, one-var, prefer-spread, prefer-template, space-before-blocks, space-before-function-paren, space-infix-ops */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
+define(function(require) {
+
+require("./expressions.js");
 
 var kmatrix = KhanUtil.kmatrix = {
     // To add two 2-dimensional matrices, use
@@ -123,6 +129,16 @@ var kmatrix = KhanUtil.kmatrix = {
         }, mat);
     },
 
+    printFractionMatrix: function(mat, color) {
+        return kmatrix.printMatrix(function(item) {
+            item = KhanUtil.decimalFraction(item, true);
+            if (color) {
+                return KhanUtil.colorMarkup(item, color);
+            }
+            return item;
+        }, mat);
+    },
+
     /**
      * Prints matrix as determinant, like |matrix| rather than [matrix]
      */
@@ -208,10 +224,10 @@ var kmatrix = KhanUtil.kmatrix = {
 
     matrix2x2DetHint: function(mat) {
         // if terms in the matrix are letters, omit the dot
-        var operator = (typeof mat[0][0] === "string") ? "*" : "dot";
-        var termA = [operator, mat[0][0], mat[1][1]];
-        var termB = [operator, mat[0][1], mat[1][0]];
-        return KhanUtil.expr(["-", termA, termB]);
+        var operator = (typeof mat[0][0] === "string") ? " \\times " : " \\cdot ";
+        var termA = "(" + mat[0][0] + operator + mat[1][1] + ")";
+        var termB = "(" + mat[0][1] + operator + mat[1][0] + ")";
+        return termA + "-" + termB;
     },
 
     matrix3x3DetHint: function(mat, isIntermediate) {
@@ -528,4 +544,6 @@ _.each(kmatrix, function(func, name) {
     KhanUtil[name] = func;
 });
 
-})(KhanUtil);
+return kmatrix;
+
+});

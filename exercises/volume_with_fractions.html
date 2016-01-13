@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
     <title>Volume 2</title>
-    <script src="../khan-exercise.js"></script>
+    <script data-main="../local-only/main.js" src="../local-only/require.js"></script>
     <script type="text/javascript">
         var makeSquare = function(left, width, bottom, height, color) {
             KhanUtil.currentGraph.path([
@@ -28,20 +28,8 @@
 <body>
 <div class="exercise">
     <div class="vars">
-        <var id="UNIT_TEXT,UNIT">randFromArray([
-            ["\\text{ " + $._("cm") + "}", new Plural(function(num) {
-            return $.ngettext("centimeter", "centimeters", num);
-            })],
-            ["\\text{ " + $._("m") + "}", new Plural(function(num) {
-            return $.ngettext("meter", "meters", num);
-            })],
-            ["\\text{ " + $._("in") + "}", new Plural(function(num) {
-            return $.ngettext("inch", "inches", num);
-            })],
-            ["\\text{ " + $._("ft") + "}", new Plural(function(num) {
-            return $.ngettext("foot", "feet", num);
-            })]
-        ])</var>
+        <var id="UNIT_SMALL,UNIT">randFromArray(metricUnits)</var>
+        <var id="UNIT_TEXT">"\\text{ " + UNIT_SMALL + "}"</var>
     </div>
     <div class="problems">
 
@@ -113,13 +101,15 @@
                 <var id="GRAPH">{}</var>
                 <var id="UNWRAPGRAPH">{}</var>
 
-                <var id="VOLUME_TEXT">$._("volume")</var>
-                <var id="BASE_TEXT">$._("base")</var>
-                <var id="HEIGHT_TEXT">$._("height")</var>
+                <var id="VOLUME_TEXT">i18n._("volume")</var>
+                <var id="BASE_TEXT">i18n._("base")</var>
+                <var id="HEIGHT_TEXT">i18n._("height")</var>
 
             </div>
 
             <p class="question">What is the volume of this box? Drag on the box to rotate it.</p>
+
+            <p class="render-answer-area-here"></p>
 
             <div class="graphie" id = "box">
                 init({range: [[-2, 2], [-2, 2]], scale: [100, 100]});
@@ -194,7 +184,7 @@
                 <p>The volume of a shape is measured by the number of one <var>UNIT</var> cubes which make up the shape.</p>
                 <p>The volume of a box equals width <code>\times</code> height <code>\times</code> length.</p>
                 <p>
-                    Therefore, <code><var>VOLUME_TEXT</var> = <var>FRACTIONS[0]</var> \cdot <var>FRACTIONS[1]</var> \cdot <var>FRACTIONS[2]</var></code>
+                    Therefore, <code>\text{<var>VOLUME_TEXT</var>} = <var>FRACTIONS[0]</var> \cdot <var>FRACTIONS[1]</var> \cdot <var>FRACTIONS[2]</var></code>
                 </p>
                 <p>
                     <code>\qquad = <span data-if="getGCD(NUMERPRODUCT / GCD, DENOMPRODUCT / GCD) !== 1">
@@ -270,16 +260,16 @@
                 <var id="GRAPH">{}</var>
                 <var id="UNWRAPGRAPH">{}</var>
 
-                <var id="BASE_TEXT">$._("base")</var>
-                <var id="HEIGHT_TEXT">$._("height")</var>
-
-
+                <var id="BASE_TEXT">i18n._("base")</var>
+                <var id="HEIGHT_TEXT">i18n._("height")</var>
             </div>
 
             <p class="question">
                 The volume of this box is <code><var>VOL</var> <var>UNIT_TEXT</var>^3</code>.
                 Find <code>x</code>.
             </p>
+
+            <p class="render-answer-area-here"></p>
 
             <div class="graphie" id = "box">
                 init({range: [[-2, 2], [-2, 2]], scale: [100, 100]});
@@ -378,7 +368,14 @@
 
             </div>
 
-            <div class="solution" data-type="number"><var>HEIGHT</var></div>
+            <div class="solution" data-type="multiple">
+                <p>
+                    <code>x = </code>
+                    <span class="sol" data-type="number" data-simplify="optional">
+                        <var>HEIGHT</var>
+                    </span><code><var>UNIT_TEXT</var></code>
+                </p>
+            </div>
 
             <div class="hints">
                 <p>The volume of a box equals width <code>\times</code> height <code>\times</code> length.</p>

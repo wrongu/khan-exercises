@@ -1,14 +1,14 @@
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, indent, no-trailing-spaces, no-undef, no-unused-vars, prefer-spread */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
 /*
  * Vector Utils 
  * A vector is an array of numbers e.g. [0, 3, 4].
  */
+define(function(require) {
 
-(function(KhanUtil) {
-
-var knumber = KhanUtil.knumber;
-$.fn["kvectorLoad"] = function() {
-    knumber = KhanUtil.knumber;
-};
+var knumber = require("./knumber.js");
 
 function arraySum(array) {
     return _.reduce(array, function(memo, arg) { return memo + arg; }, 0);
@@ -19,6 +19,16 @@ function arrayProduct(array) {
 }
 
 var kvector = KhanUtil.kvector = {
+
+    is: function(vec, length) {
+        if (!_.isArray(vec)) {
+            return false;
+        }
+        if (length !== undefined && vec.length !== length) {
+            return false;
+        }
+        return _.all(vec, knumber.is);
+    },
 
     // Normalize to a unit vector
     normalize: function(v) {
@@ -173,7 +183,35 @@ var kvector = KhanUtil.kvector = {
     projection: function(v1, v2) {
         var scalar = kvector.dot(v1, v2) / kvector.dot(v2, v2);
         return kvector.scale(v2, scalar);
+    },
+
+    // Round each number to a certain number of decimal places
+    round: function(vec, precision) {
+        return _.map(vec, function(elem, i) {
+            return knumber.round(elem, precision[i] || precision);
+        });
+    },
+
+    // Round each number to the nearest increment
+    roundTo: function(vec, increment) {
+        return _.map(vec, function(elem, i) {
+            return knumber.roundTo(elem, increment[i] || increment);
+        });
+    },
+
+    floorTo: function(vec, increment) {
+        return _.map(vec, function(elem, i) {
+            return knumber.floorTo(elem, increment[i] || increment);
+        });
+    },
+
+    ceilTo: function(vec, increment) {
+        return _.map(vec, function(elem, i) {
+            return knumber.ceilTo(elem, increment[i] || increment);
+        });
     }
 };
 
-})(KhanUtil);
+return kvector;
+
+});

@@ -1,18 +1,17 @@
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, comma-spacing, indent */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
 /*
  * Ray Utils
  * A ray is an array of an endpoint and another point along the ray.
  * For example, [[0, 0], [1, 0]] is the ray starting at the origin and
  * traveling along the positive x-axis.
  */
+define(function(require) {
 
-(function(KhanUtil) {
-
-var kvector = KhanUtil.kvector;
-var kpoint = KhanUtil.kpoint;
-$.fn["krayLoad"] = function() {
-    kvector = KhanUtil.kvector;
-    kpoint = KhanUtil.kpoint;
-};
+var kvector = require("./kvector.js");
+var kpoint = require("./kpoint.js");
 
 var kray = KhanUtil.kray = {
 
@@ -28,4 +27,6 @@ var kray = KhanUtil.kray = {
     }
 };
 
-})(KhanUtil);
+return kray;
+
+});

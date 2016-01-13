@@ -1,4 +1,11 @@
-(function() {
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, indent, no-undef */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
+define(function(require) {
+
+require("./math.js");
+require("./graphie.js");
 
 /**
  * Provides a concise API for drawing static versions of the 2D
@@ -43,6 +50,10 @@ var toDashed = function(obj) {
 
 // Return the normal and label styles for a given options object
 var getStyles = function(options) {
+    options = _.pick(options, "color", "dashed", "dotted", "fill",
+        "fillOpacity", "font", "fontFamily", "fontSize", "fontWeight",
+        "opacity", "stroke", "strokeDasharray", "strokeOpacity",
+        "strokeWidth");
     // Color overrides stroke and fill if not present
     if (_.has(options, "color")) {
         _.defaults(options, {
@@ -156,6 +167,7 @@ $.extend(KhanUtil.Graphie.prototype, {
         // Shorthand defaults for all per angle/side/vertex properties
         var defaults = {
             angleLabels: "",
+            showRightAngleMarkers: true,
             sideLabels: "",
             vertexLabels: "",
             arcs: 0,
@@ -167,7 +179,7 @@ $.extend(KhanUtil.Graphie.prototype, {
         _.defaults(options, defaults, {
             points: [[3, -2], [0, 4], [-3, -2]]
         });
-        
+
         expandKeys(options, _.keys(defaults), options.points.length);
 
         var styles = getStyles(_.omit(options, "arrows"));
@@ -270,6 +282,7 @@ $.extend(KhanUtil.Graphie.prototype, {
         _.defaults(options, {
             points: [],
             label: "",
+            showRightAngleMarker: true,
             distance: 0,
             arcs: 1
         });
@@ -282,6 +295,7 @@ $.extend(KhanUtil.Graphie.prototype, {
             point3: options.points[2],
             clockwise: true,
             text: options.label,
+            showRightAngleMarker: options.showRightAngleMarker,
             numArcs: options.arcs,
             pushOut: options.distance,
             style: styles.labelStyle
@@ -291,4 +305,4 @@ $.extend(KhanUtil.Graphie.prototype, {
     // TODO(alex): drawPolyline(), drawSpokes(), labelSegment()
 });
 
-})();
+});

@@ -1,3 +1,9 @@
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, indent, max-len, no-unused-vars, prefer-spread, prefer-template, no-undef */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
+define(function(require) {
+
 $.extend(KhanUtil, {
 
     initCongruence: function(options) {
@@ -544,7 +550,7 @@ $.extend(KhanUtil, {
         };
 
         $(".question").prepend("<button id='reflect' type='button'>" +
-            $._("Reflect shape") + "</button>");
+            i18n._("Reflect shape") + "</button>");
         $("button#reflect").bind("click", function(event) {
             this.blur();
             if (!triangle.animating) {
@@ -676,5 +682,7 @@ $.extend(KhanUtil, {
         graphie.drawArcs(triangle.points[1], triangle.points[2], triangle.points[0], arcs[2]);
         $(triangle.set).each(function() { this.toBack(); });
     }
+
+});
 
 });

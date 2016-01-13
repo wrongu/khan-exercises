@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <title>Graphing linear equations</title>
-    <script src="../khan-exercise.js"></script>
+    <script data-main="../local-only/main.js" src="../local-only/require.js"></script>
 </head>
 <body>
 <div class="exercise">
@@ -133,9 +133,6 @@
             </div>
 
             <div class="solution" data-type="custom">
-                <div class="instruction">
-                    Drag the two points to move the line into the correct position.
-                </div>
                 <div class="guess"> [ graph.pointA.coord, graph.pointB.coord ] </div>
                 <div class="validator-function">
                     return abs(guess[0][0] - XINT) &lt; 0.001 &amp;&amp; abs(guess[1][0] - XINT) &lt; 0.001;
@@ -242,8 +239,8 @@
                             path([ [ 0, YINT ], [ 0, YINT + SLOPE_FRAC[0] ] ]).toBack();
                             path([ [ 0, YINT + SLOPE_FRAC[0] ], [ SLOPE_FRAC[1], YINT + SLOPE_FRAC[0] ] ]).toBack();
                         });
-                        label( [ 0, YINT + SLOPE_FRAC[0] / 2 ], abs( SLOPE_FRAC[0] ) + " \\text{ " + ( SLOPE_FRAC[0] &lt; 0 ? $._("down") : $._("up") ) + "} \\quad", "left", { color: "purple" } );
-                        label( [ 0, YINT + SLOPE_FRAC[0] ], SLOPE_FRAC[1] + " \\text{ " + $._("right") + "}", ( SLOPE_FRAC[0] &lt; 0 ? "below right" : "above right" ), { color: "purple" } );
+                        label( [ 0, YINT + SLOPE_FRAC[0] / 2 ], abs( SLOPE_FRAC[0] ) + " \\text{ " + ( SLOPE_FRAC[0] &lt; 0 ? i18n._("down") : i18n._("up") ) + "} \\quad", "left", { color: "purple" } );
+                        label( [ 0, YINT + SLOPE_FRAC[0] ], SLOPE_FRAC[1] + " \\text{ " + i18n._("right") + "}", ( SLOPE_FRAC[0] &lt; 0 ? "below right" : "above right" ), { color: "purple" } );
                         graph.yint.toBack();
                     </div>
                 </div>
@@ -324,9 +321,6 @@
                 </div>
             </div>
             <div class="solution" data-type="custom">
-                <div class="instruction">
-                    Drag the two points to move the line into the correct position.
-                </div>
                 <div class="guess"> [ graph.pointA.coord, graph.pointB.coord ] </div>
                 <div class="validator-function">
                     if (_.isEqual(guess, [[-5, 5], [5, 5]])) {

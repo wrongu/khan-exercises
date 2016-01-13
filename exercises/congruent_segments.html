@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <title>Congruent segments</title>
-    <script src="../khan-exercise.js"></script>
+    <script data-main="../local-only/main.js" src="../local-only/require.js"></script>
     <style>
         .lcol { text-align:left; width:200px; display:inline-block; }
         .rcol { text-align:left; width:auto; display:inline-block; }
@@ -14,7 +14,7 @@
     <div class="problems">
         <div>
             <div class="vars">
-                <var id="YES,NO">[$._("Yes"), $._("No")]</var>
+                <var id="YES,NO">[i18n._("Yes"), i18n._("No")]</var>
                 <var id="SOLUTION">random() &lt; 0.5 ? YES : NO</var>
                 <div data-ensure="( SOLUTION === YES &amp;&amp; POINTS[ 1 ] - POINTS[ 0 ] === POINTS[ 3 ] - POINTS[ 2 ] ) || ( SOLUTION === NO &amp;&amp; POINTS[ 1 ] - POINTS[ 0 ] !== POINTS[ 3 ] - POINTS[ 2 ] )">
                     <var id="POINTS">sortNumbers( randRangeUnique( -5, 5, 4 ) )</var>
@@ -22,6 +22,7 @@
                 <var id="COLORS">[ BLUE, GREEN, PINK, ORANGE ]</var>
             </div>
             <p class="question">Are <code>\overline{AB}</code> and <code>\overline{CD}</code> congruent?</p>
+            <p class="render-answer-area-here"></p>
             <div class="problem">
                 <div class="graphie" id="number-line">
                     init({

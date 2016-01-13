@@ -4,7 +4,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <title>Trigonometry 1.5</title>
-    <script src="../khan-exercise.js"></script>
+    <script data-main="../local-only/main.js" src="../local-only/require.js"></script>
     <script>
         function fractionSQRoot(b, root){
             var natRoot = KhanUtil.splitRadical(root)[0];
@@ -129,9 +129,9 @@
             <var id="SIMPLE_COS">fraction(reduce(ADJACENT_VALUE, AB)[0], reduce(ADJACENT_VALUE, AB)[1])</var>
             <var id="COS">ADJACENT_VALUE / AB</var>
 
-            <var id="OPPOSITE_TEXT">$._("opposite")</var>
-            <var id="HYPOTENUSE_TEXT">$._("hypotenuse")</var>
-            <var id="ADJACENT_TEXT">$._("adjacent")</var>
+            <var id="OPPOSITE_TEXT">i18n._("opposite")</var>
+            <var id="HYPOTENUSE_TEXT">i18n._("hypotenuse")</var>
+            <var id="ADJACENT_TEXT">i18n._("adjacent")</var>
         </div>
 
         <div class="problems">
@@ -142,6 +142,8 @@
                 </div>
                 <div class="question">
                     <p><code>\overline{<var>OPPOSITE_NAME</var>} = {?}</code></p>
+
+                    <p class="render-answer-area-here"></p>
 
                     <div class="graphie">
                         var options = {};
@@ -176,6 +178,8 @@
                 </div>
                 <div class="question">
                     <p><code>\overline{AB} = {?}</code></p>
+
+                    <p class="render-answer-area-here"></p>
 
                     <div class="graphie">
                         var options = {};
@@ -212,6 +216,8 @@
                 <div class="question">
                     <p><code>\overline{<var>ADJACENT_NAME</var>} = {?}</code></p>
 
+                    <p class="render-answer-area-here"></p>
+
                     <div class="graphie">
                         var options = {};
                         options[ ADJACENT_NAME ] = "?";
@@ -245,6 +251,8 @@
                 </div>
                 <div class="question">
                     <p><code>\overline{AB} = {?}</code></p>
+
+                    <p class="render-answer-area-here"></p>
 
                     <div class="graphie">
                         var options = {};
@@ -281,6 +289,8 @@
                 <div class="question">
                     <p><code>\overline{<var>ADJACENT_NAME</var>} = {?}</code></p>
 
+                    <p class="render-answer-area-here"></p>
+
                     <div class="graphie">
                         var options = {};
                         options[ ADJACENT_NAME ] = "?";
@@ -315,6 +325,8 @@
                 </div>
                 <div class="question">
                     <p><code>\overline{<var>OPPOSITE_NAME</var>} = {?}</code></p>
+
+                    <p class="render-answer-area-here"></p>
 
                     <div class="graphie">
                         var options = {};

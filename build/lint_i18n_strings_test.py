@@ -26,7 +26,7 @@ TESTS = {
                 'Re-run with --fix to automatically fix them.']
     },
     'plural': {
-        'nodes_changed': 19,
+        'nodes_changed': 16,
         'errors': [
             'Ambiguous plural usage (UNIT_TEXT, S):\n'
                 '<var>AMBIGUOUS_PLURAL(UNIT_TEXT, S)</var>',
@@ -34,9 +34,7 @@ TESTS = {
                 '<var>AMBIGUOUS_PLURAL(UNIT_TEXT, S)</var>',
             'Ambiguous plural usage (UNIT_TEXT, S):\n'
                 '<var>AMBIGUOUS_PLURAL(UNIT_TEXT, S)</var>',
-            'Ambiguous plural usage (UNIT_TEXT, B):\n'
-                '<var>AMBIGUOUS_PLURAL(UNIT_TEXT, B)</var>',
-            '19 nodes need to be fixed. '
+            '16 nodes need to be fixed. '
                 'Re-run with --fix to automatically fix them.']
     },
     'ternary': {
@@ -57,7 +55,7 @@ TESTS = {
     'text': {
         'nodes_changed': 12,
         'errors': [
-            'Using $._ inside of a <var>:\n<var>$._("%(something)s", '
+            'Using i18n._ inside of a <var>:\n<var>i18n._("%(something)s", '
                 '{something: something})</var>',
             '12 nodes need to be fixed. '
             'Re-run with --fix to automatically fix them.']
@@ -65,9 +63,10 @@ TESTS = {
     'dollars_in_vars': {
         'nodes_changed': 0,
         'errors': [
-            'Using $._ inside of a <var>:\n<var>$._("Test")</var>',
-            "Using $._ inside of a <var>:\n<var>$._('Test')</var>",
-            'Using $._ inside of a <var>:\n<var>$._("Test", {blah: 1})</var>',
+            'Using i18n._ inside of a <var>:\n<var>i18n._("Test")</var>',
+            "Using i18n._ inside of a <var>:\n<var>i18n._('Test')</var>",
+            ('Using i18n._ inside of a <var>:\n'
+             '<var>i18n._("Test", {blah: 1})</var>'),
         ]
     },
     'ok_text': {

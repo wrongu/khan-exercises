@@ -1,3 +1,13 @@
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, eqeqeq, indent, max-len, no-redeclare, no-undef, no-unused-vars, one-var */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
+define(function(require) {
+
+require("./angles.js");
+require("./interactive.js");
+require("./graphie-helpers.js");
+
 $.extend(KhanUtil, {
     // Add a "congruency" object that stores data about the
     // points, lines, and angles that you added to the congruency
@@ -269,6 +279,11 @@ $.extend(KhanUtil, {
                 // add our line
                 this.line.push(graph.line(this.start, this.end));
 
+                // add parallel line marker to horizontal line
+                if (direction[1] === 0) {
+                    ParallelLineMarkers(this.end[0] - 0.5, this.end[1]);
+                }
+
                 // set the attributes
                 this.line.attr(this.point.normalStyle);
                 this.point.visibleShape = this.line;
@@ -353,7 +368,7 @@ $.extend(KhanUtil, {
             };
 
             // make the clickable point change the state
-            $(line.point.mouseTarget[0]).bind("vmouseup", function(event) {
+            $(line.point.mouseTarget.getMouseTarget()).bind("vmouseup", function(event) {
                 line.setState((line.state === line.maxState) ? 0 : line.state + 1);
             });
 
@@ -416,7 +431,7 @@ $.extend(KhanUtil, {
             };
 
             // Make a clicky pointer
-            $(angle.point.mouseTarget[0]).css("cursor", "pointer");
+            $(angle.point.mouseTarget.getMouseTarget()).css("cursor", "pointer");
 
             // Increase the point's size
             var pointRadius = Math.sin(KhanUtil.toRadians(angle.angle) / 2) *
@@ -504,14 +519,14 @@ $.extend(KhanUtil, {
             angle.draw();
 
             // Bind mouseclick
-            $(angle.point.mouseTarget[0]).bind("vmouseup", function(event) {
+            $(angle.point.mouseTarget.getMouseTarget()).bind("vmouseup", function(event) {
                 angle.setState((angle.state === angle.maxState) ? 0 : angle.state + 1);
             });
 
             // Make an angle stick in its current state
             // by removing the clicky part
             angle.stick = function() {
-                $(this.point.mouseTarget[0]).unbind();
+                $(this.point.mouseTarget.getMouseTarget()).unbind();
                 this.point.mouseTarget.remove();
             };
 
@@ -661,4 +676,6 @@ $.extend(KhanUtil, {
 
         return congruency;
     }
+});
+
 });

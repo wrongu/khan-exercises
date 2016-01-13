@@ -3,34 +3,18 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <title>Finding perimeter</title>
-    <script src="../khan-exercise.js"></script>
+    <script data-main="../local-only/main.js" src="../local-only/require.js"></script>
 </head>
 <body>
 <div class="exercise">
     <div class="vars">
-        <var id="UNIT,UNIT_TEXT">randFromArray([
-            ["in", new Plural(function(num) {
-                return $.ngettext("inch", "inches", num);
-            })],
-            ["ft", new Plural(function(num) {
-                return $.ngettext("foot", "feet", num);
-            })],
-            ["m", new Plural(function(num) {
-                return $.ngettext("meter", "meters", num);
-            })],
-            ["cm", new Plural(function(num) {
-                return $.ngettext("centimeter", "centimeters", num);
-            })],
-            ["", new Plural(function(num) {
-                return $.ngettext("unit", "units", num);
-            })]
-        ])</var>
+        <var id="UNIT,UNIT_TEXT">randFromArray(metricUnits.concat([genericUnit]))</var>
     </div>
     <div class="problems">
         <div id="square-s-to-P">
             <div class="vars">
                 <var id="S">randRange(1, 8)</var>
-                <var id="PERIMETER">$._("perimeter")</var>
+                <var id="PERIMETER">i18n._("perimeter")</var>
             </div>
 
             <p class="question"><span data-if="isSingular(S)" data-unwrap="">
@@ -106,7 +90,7 @@
                         path([[0, 0], [5, 0], [5, 5], [0, 5], true],
                             { stroke: BLUE, fill: "#eee" });
                         path([[0, 0], [0, 5]], { "stroke": PINK });
-                        label([0, 2.5], "\\text{" + $._("? %(UNIT)s", {UNIT: UNIT}) + "}", "left",
+                        label([0, 2.5], "\\text{" + i18n._("? %(UNIT)s", {UNIT: UNIT}) + "}", "left",
                             { "color": PINK });
                     </div>
                 </div>
@@ -152,19 +136,20 @@
             <div class="vars" data-ensure="L !== W">
                 <var id="L">randRange(1, 8)</var>
                 <var id="W">randRange(1, 8)</var>
-                <var id="PERIMETER">$._("perimeter")</var>
+                <var id="PERIMETER">i18n._("perimeter")</var>
             </div>
 
             <p class="question">
-                <span data-if="isSingular(L)">A rectangle is
-                <code><var>L</var></code> <var>UNIT_TEXT</var>
-                long.</span><span data-else="">A rectangle is
-                <code><var>L</var></code> <var>plural_form(UNIT_TEXT, L)</var>
-                long.</span> <span data-if="isSingular(W)">The rectangle is also
-                <code><var>W</var></code> <var>UNIT_TEXT</var>
-                wide. What is its perimeter?</span><span data-else="">The rectangle is also
-                <code><var>W</var></code> <var>plural_form(UNIT_TEXT, W)</var>
-                wide. What is its perimeter?</span>
+                <span data-if="isSingular(L)">
+                    One side of a rectangle is <code><var>L</var></code> <var>UNIT_TEXT</var>.
+                </span><span data-else="">
+                    One side of a rectangle is <code><var>L</var></code> <var>plural_form(UNIT_TEXT, L)</var>.
+                </span><span data-if="isSingular(W)">
+                    Another side is <code><var>W</var></code> <var>UNIT_TEXT</var>.
+                </span><span data-else="">
+                    Another side is <code><var>W</var></code> <var>plural_form(UNIT_TEXT, W)</var>.
+                </span>
+                What is its perimeter?
             </p>
 
             <div class="solution" data-type="multiple">

@@ -1,3 +1,9 @@
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, indent, max-len, no-unused-vars */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
+define(function(require) {
+
 $.extend(KhanUtil, {
     spin: function(content) {
         // First find all top-level blocks and spin them
@@ -45,3 +51,5 @@ $.fn.spin = function() {
         $(this).html(spun);
     });
 };
+
+});

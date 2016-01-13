@@ -1,3 +1,7 @@
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, indent, no-undef, no-unused-vars, prefer-template */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
 /**
  * Allows for intuitive matrix input for matrix exercises.
  *
@@ -29,12 +33,17 @@
  * </div>
  *
  */
+define(function(require) {
+
+require("../third_party/jquery.cursor-position.js");
 
 $.extend(KhanUtil, {
 
     matrixInput: {
 
         eventsAttached: false,
+
+        eventNamespace: "matrix-input",
 
         containerEl: null,
         bracketEls: null,
@@ -60,7 +69,7 @@ $.extend(KhanUtil, {
 
             this.initContainer();
 
-            var inputs = $(".matrix-input .sol input[type='text']");
+            var inputs = $(".matrix-row .sol input[type='text']");
             this.cells = _.map(inputs, function(input, i) {
                 return {
                     el: input,
@@ -77,14 +86,16 @@ $.extend(KhanUtil, {
             });
 
             this.addBrackets();
-
             this.bindInputEvents();
             this.resetAllMaxVals();
             this.render();
         },
 
         initContainer: function() {
-            this.containerEl = $("#solutionarea").addClass("matrix-input");
+            this.containerEl = $("#solutionarea .matrix-input");
+            if (!this.containerEl[0]) {
+                this.containerEl = $("#solutionarea").addClass("matrix-input");
+            }
         },
 
         addBrackets: function(i) {
@@ -120,10 +131,17 @@ $.extend(KhanUtil, {
             // the user will get to change the value.
             var self = this;
 
+            // Track whether or not a click originated in an input to avoid
+            // calling the global matrix sizing reset that we append to <body>
+            var clickedInput = false;
+
             // case #1
-            $("body").click(function() {
-                self.resetMaxToContentMax();
-                self.render();
+            $("body").on("click." + self.eventNamespace, function() {
+                if (!clickedInput) {
+                    self.resetMaxToContentMax();
+                    self.render();
+                }
+                clickedInput = false;
             });
 
             _.each(this.cells, function(cell) {
@@ -139,11 +157,10 @@ $.extend(KhanUtil, {
                         self.setMaxVals(cell);
                     },
 
-                    // case #1 (prevent from performing a redundant
-                    // reevaluation when clicking on a cell, since focus event
-                    // is triggered on both tabs and clicks)
+                    // case #1 (track whether or not a click originated in an
+                    // input to avoid calling the click event bound to <body>)
                     click: function(e) {
-                        e.stopPropagation();
+                        clickedInput = true;
                     },
 
                     keydown: function(e) {
@@ -316,6 +333,7 @@ $.extend(KhanUtil, {
         },
 
         cleanup: function() {
+            $("body").off("." + this.eventNamespace);
             this.removeBrackets();
         }
     }
@@ -349,3 +367,5 @@ $.fn["matrix-inputCleanup"] = function() {
 
     KhanUtil.matrixInput.eventsAttached = false;
 };
+
+});

@@ -1,4 +1,10 @@
-(function() {
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, eqeqeq, indent, max-len, no-alert, no-redeclare, no-undef, no-unused-vars, no-with, one-var, prefer-template */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
+define(function(require) {
+
+var crc32 = require("./crc32.js");
 
 var localMode;
 
@@ -127,7 +133,7 @@ $.tmpl = {
             youtubeIds = youtubeIds.split(/,\s*/);
 
             var author = $(elem).data("video-hint-author") || "Sal";
-            var msg = $._("Watch %(author)s work through a very similar " +
+            var msg = i18n._("Watch %(author)s work through a very similar " +
                 "problem:", {author: author});
             var preface = $("<p>").text(msg);
 
@@ -220,9 +226,6 @@ $.tmpl = {
         // We need to compute the value
         var code = elem.nodeName ? $(elem).text() : elem;
 
-        // Make sure any HTML formatting is stripped
-        code = $.trim($.tmpl.cleanHTML(code));
-
         // If no extra context was passed, use an empty object
         if (ctx == null) {
             ctx = {};
@@ -284,14 +287,9 @@ $.tmpl = {
 
         // Just convert top-level values to strings instead of recursively
         // stringifying, due to issues with circular references.
-        return KhanUtil.crc32(JSON.stringify($.map(VARS, function(value, key) {
+        return crc32(JSON.stringify($.map(VARS, function(value, key) {
             return [key, String(value)];
         })));
-    },
-
-    // Make sure any HTML formatting is stripped
-    cleanHTML: function(text) {
-        return ("" + text).replace(/&gt;/g, ">").replace(/&lt;/g, "<").replace(/&amp;/g, "&");
     }
 };
 
@@ -646,4 +644,4 @@ $.extend({
     }
 });
 
-})();
+});

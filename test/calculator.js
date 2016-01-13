@@ -54,13 +54,16 @@
     });
 
 
-    asyncTest("pi, euler and natural logarithm", 6, function() {
+    asyncTest("pi, euler and logarithms", 9, function() {
         calculateStartsWith('pi', 3.1415);
         calculateStartsWith('2*pi', 6.2831);
         calculateStartsWith('e', 2.7182);
         calculateStrictEqual('ln(e^2)', 2);
         checkError('ln(-1)', /undefined/, 'ln for x < 0 is undefined (for x=-1)');
         checkError('ln(0)', /undefined/, 'ln for 0 is -infinity (undefined?)');
+        calculateStrictEqual('log(10000)', 4);
+        checkError('log(-1)', /undefined/, 'log for x < 0 is undefined (for x=-1)');
+        checkError('log(0)', /undefined/, 'log for 0 is -infinity (undefined?)');
         start();
     });
 
@@ -79,8 +82,8 @@
         start();
     });
 
-    asyncTest("trigonometry degrees mode", 6, function() {
-        strictEqual(Calculator.settings.angleMode, 'DEG', 'default angle mode is degrees');
+    asyncTest("trigonometry degrees mode", 5, function() {
+        Calculator.settings.angleMode = 'DEG';
         calculateStrictEqual('cos(180)', -1);
         calculateStrictEqual('sin(270)', -1);
         calculateStrictEqual('asin(1)', 90);
@@ -134,21 +137,17 @@
         start();
     });
 
-    asyncTest("parse error", 8, function() {
-        checkError('(', /Parse error/, 'opening bracket without closing bracket');
-        checkError(')', /Parse error/, 'closing bracket without opening bracket');
-        checkError('()', /Parse error/, 'empty brackets');
-        checkError('tan', /Parse error/, 'possible function without opening bracket');
-        checkError('4-', /Parse error/, 'no number after operation');
-        checkError('4 4', /Parse error/, 'missing operation');
+    asyncTest("error", 9, function() {
+        checkError('(', /Error/, 'opening bracket without closing bracket');
+        checkError(')', /Error/, 'closing bracket without opening bracket');
+        checkError('()', /Error/, 'empty brackets');
+        checkError('tan', /Error/, 'possible function without opening bracket');
+        checkError('4-', /Error/, 'no number after operation');
+        checkError('4 4', /Error/, 'missing operation');
 
-        checkError('2pi', /Parse error/, 'needs operator before constant like pi');
-        checkError('3(2-1)', /Parse error/, 'needs operator before opening bracket');
-        start();
-    });
-
-    asyncTest("error", 1, function() {
-        checkError('tanh(0)', /err/, 'unknown function results in err = output (not sure if on purpose)');
+        checkError('2pi', /Error/, 'needs operator before constant like pi');
+        checkError('3(2-1)', /Error/, 'needs operator before opening bracket');
+        checkError('tanh(0)', /Error/, 'unknown function');
         start();
     });
 

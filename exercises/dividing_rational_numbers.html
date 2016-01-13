@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <title>Dividing rational numbers</title>
-    <script src="../khan-exercise.js"></script>
+    <script data-main="../local-only/main.js" src="../local-only/require.js"></script>
 </head>
 <body>
     <div class="exercise">
@@ -177,9 +177,6 @@
                         graph.divider = new Divider(DIVISOR_N, DIVIDEND_N, DIVISOR_P, DIVIDEND_P);
                         graph.divider.show();
                     </div>
-                    <div class="graphie" data-update="div-1">
-                        graph.divider.shiftDecimals();
-                    </div>
                     <div class="graphie" data-each="HINTS1 as hint" data-update="div-1">
                         graph.divider.showHint();
                     </div>
@@ -275,9 +272,6 @@
                     <div class="graphie" id="div-1">
                         graph.divider = new Divider(DIVISOR_N, DIVIDEND_N, DIVISOR_P, DIVIDEND_P);
                         graph.divider.show();
-                    </div>
-                    <div class="graphie" data-update="div-1">
-                        graph.divider.shiftDecimals();
                     </div>
                     <div class="graphie" data-each="HINTS1 as hint" data-update="div-1">
                         graph.divider.showHint();

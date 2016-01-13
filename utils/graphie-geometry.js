@@ -1,9 +1,14 @@
-// TODO(eater): shove these into KhanUtil or somewhere reasonable
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable brace-style, comma-dangle, comma-spacing, eqeqeq, indent, max-len, no-redeclare, no-undef, no-unused-vars, one-var, prefer-template, space-before-keywords, space-infix-ops, space-unary-ops */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
 
-window.kline = KhanUtil.kline;
-$.fn["graphie-geometryLoad"] = function() {
-    window.kline = KhanUtil.kline;
-};
+define(function(require) {
+
+require("./graphie.js");
+var kline = require("./kline.js");
+var kmatrix = require("./kmatrix.js");
+
+// TODO(eater): shove these into KhanUtil or somewhere reasonable
 
 window.rotatePoint = function(p, deg, c) {
     c = c || [0, 0];
@@ -220,7 +225,7 @@ window.Triangle = function(center, angles, scale, labels, points) {
 
     var fromPoints = false;
     if (points) {
-            fromPoints = true;
+        fromPoints = true;
     }
 
     this.labels = labels;
@@ -286,13 +291,14 @@ window.Triangle = function(center, angles, scale, labels, points) {
     };
 
     this.draw = function() {
-        this.set = KhanUtil.currentGraph.raphael.set();
+        this.set = this.set || KhanUtil.currentGraph.raphael.set();
         this.set.push(KhanUtil.currentGraph.path(this.points.concat([this.points[0]])));
         return this.set;
     };
 
     this.color = "black";
     this.createLabel = function(p, v) {
+        this.set = this.set || KhanUtil.currentGraph.raphael.set();
         this.set.push(KhanUtil.currentGraph.label(p, v, "center", { color: this.color }));
     };
 
@@ -365,7 +371,7 @@ window.Triangle = function(center, angles, scale, labels, points) {
 
     this.translate = function(amount) {
         this.points = $.map(this.points, function(el, i) {
-                return [movePoint(el, amount)];
+            return [movePoint(el, amount)];
         });
         this.genSides();
         this.findCenterPoints();
@@ -378,16 +384,22 @@ window.Triangle = function(center, angles, scale, labels, points) {
 
     this.drawLabels = function() {
         var i = 0;
+        var s = KhanUtil.currentGraph.scaleVector([1, 1])[0];
+
         if ("points" in this.labels) {
             //Need to change the position of placement into label objects
             for (i = this.angles.length - 1; i >= 0; i--) {
-                this.labelObjects.points.push(this.createLabel(bisectAngle(reverseLine(this.sides[(i + 1) % this.angles.length]), this.sides[i], 0.3)[1], this.labels.points[(i + 1) % this.angles.length]));
+                var n = (i + 1) % this.angles.length;
+                var coord = bisectAngle(reverseLine(this.sides[n]), this.sides[i], 12 / s)[1];
+                this.labelObjects.points.push(this.createLabel(coord, this.labels.points[n]));
             }
         }
 
         if ("angles" in this.labels) {
             for (i = this.angles.length - 1; i >= 0; i--) {
-                this.labelObjects.angles.push(this.createLabel(bisectAngle(this.sides[(i + 1) % this.angles.length], reverseLine(this.sides[i]), this.angleScale(this.angles[(i + 1) % this.angles.length]))[1], this.labels.angles[(i + 1) % this.angles.length]));
+                var n = (i + 1) % this.angles.length;
+                var coord = bisectAngle(this.sides[n], reverseLine(this.sides[i]), this.angleScale(this.angles[n]) * 45 / s)[1];
+                this.labelObjects.angles.push(this.createLabel(coord, this.labels.angles[n]));
             }
         }
 
@@ -396,7 +408,7 @@ window.Triangle = function(center, angles, scale, labels, points) {
                 //http://www.mathworks.com/matlabcentral/newsreader/view_thread/142201
                 var midPoint = kline.midpoint(this.sides[i]);
                 var t = lineLength([this.sides[i][1], midPoint]);
-                var d = 0.5;
+                var d = 15 / s;
                 var x3 = midPoint[0] + (this.sides[i][1][1] - midPoint[1]) / t * d;
                 var y3 = midPoint[1] - (this.sides[i][1][0] - midPoint[0]) / t * d;
                 this.labelObjects.sides.push(this.createLabel([x3, y3], this.labels.sides[i]));
@@ -404,7 +416,7 @@ window.Triangle = function(center, angles, scale, labels, points) {
         }
 
         if ("name" in this.labels) {
-                this.labelObjects["name"] = this.createLabel(bisectAngle(reverseLine(this.sides[2]), this.sides[1], 0.3)[1], this.labels.name);
+            this.labelObjects["name"] = this.createLabel(bisectAngle(reverseLine(this.sides[2]), this.sides[1], 0.3)[1], this.labels.name);
         }
 
 
@@ -526,12 +538,8 @@ window.randomTriangleAngles = {
 
         triangle: function() {
             var a, b, c;
-            a = KhanUtil.randRange(35, 150);
-            b = KhanUtil.randRange(35, 180 - a);
-            if (a + b > 160) {
-                a = Math.max(30, a - 15);
-                b = Math.max(30, b - 15);
-            }
+            a = KhanUtil.randRange(30, 120);
+            b = KhanUtil.randRange(30, 150 - a);
             c = 180 - a - b;
             return [a, b, c];
         },
@@ -539,12 +547,8 @@ window.randomTriangleAngles = {
         scalene: function() {
             var a, b, c;
             do {
-                a = KhanUtil.randRange(25, 150);
-                b = KhanUtil.randRange(25, 180 - a);
-                if (a + b > 170) {
-                    a = Math.max(30, a - 15);
-                    b = Math.max(30, b - 15);
-                }
+                a = KhanUtil.randRange(30, 120);
+                b = KhanUtil.randRange(30, 150 - a);
                 c = 180 - a - b;
             } while (a === b || a === c || b === c);
             return [a, b, c];
@@ -880,13 +884,13 @@ KhanUtil.Graphie.prototype.addTriangle = function(triangle) {
     }, triangle);
 
     var rotatePoint = function(point, angle) {
-        var matrix = KhanUtil.kmatrix.makeMatrix([
+        var matrix = kmatrix.makeMatrix([
             [Math.cos(angle), -Math.sin(angle), 0],
             [Math.sin(angle), Math.cos(angle), 0],
             [0, 0, 1]
         ]);
-        var vector = KhanUtil.kmatrix.makeMatrix([[point[0]], [point[1]], [1]]);
-        var prod = KhanUtil.kmatrix.matrixMult(matrix, vector);
+        var vector = kmatrix.makeMatrix([[point[0]], [point[1]], [1]]);
+        var prod = kmatrix.matrixMult(matrix, vector);
         return [prod[0][0], prod[1][0]];
     };
 
@@ -988,6 +992,22 @@ KhanUtil.Graphie.prototype.addTriangle = function(triangle) {
         });
     };
 
+    // Return the points coorresponding to an alitude to angle[n]
+    triangle.findAltitude = function(n) {
+        var p1 = triangle.points[n];
+        var p2 = triangle.points[(n + 1) % 3];
+        var p3 = triangle.points[(n + 2) % 3];
+
+        // Project p1 onto line between p2 and p3
+        // Could use kvector's projection method
+        var v1 = [p1[0] - p2[0], p1[1] - p2[1]];
+        var v2 = [p3[0] - p2[0], p3[1] - p2[1]];
+        var dot1 = v1[0] * v2[0] + v1[1] * v2[1];
+        var dot2 = v2[0] * v2[0] + v2[1] * v2[1];
+        var s = dot1 / dot2;
+        return [p1, [p2[0] + v2[0] * s, p2[1] + v2[1] * s]];
+    };
+
     triangle.points[2] = [0, 0];
     triangle.points[1] = [triangle.sides[0], 0];
     triangle.points[0] = [Math.cos(triangle.angles[2] * Math.PI / 180) *
@@ -1021,3 +1041,5 @@ KhanUtil.Graphie.prototype.addTriangle = function(triangle) {
 
     return triangle;
 };
+
+});

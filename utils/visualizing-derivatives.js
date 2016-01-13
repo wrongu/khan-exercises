@@ -1,3 +1,9 @@
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, eqeqeq, indent, max-len, no-redeclare, no-undef, no-unused-vars, one-var, prefer-template */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
+define(function(require) {
+
 $.extend(KhanUtil, {
 
     PiecewiseFunction: function(options) {
@@ -984,49 +990,52 @@ $.extend(KhanUtil, {
             var self = this;
             _.each(this.problem.fnArray, function(fn, i) {
                 var nth = i > 0 ?
-                    $._("next") :
-                    $._("first");
+                    i18n._("next") :
+                    i18n._("first");
 
                 fn = fn.derivative();
 
                 var nCoefs = fn.coefs.length;
-                var inc;
+                var hint;
                 if (nCoefs === 1) {
-                    if (fn.coefs[0] === 0) {
-                        inc = $._("zero");
-                    } else if (fn.coefs[0] > 0) {
-                        inc = $._("constant and positive");
+                    var val = "<code>" + fn.coefs[0] + "</code>";
+                    if (moveDeriv) {
+                        hint = i18n._("The %(nth)s section of the derivative has a constant " +
+                            "value of %(val)s, so it corresponds to an original function with " +
+                            "a constant <b>slope</b> of %(val)s.", {nth: nth, val: val});
                     } else {
-                        inc = $._("constant and negative");
+                        hint = i18n._("The %(nth)s section of the antiderivative has a constant " +
+                            "slope of %(val)s, so it corresponds to an original function " +
+                            "that has a constant value of %(val)s.", {nth: nth, val: val});
                     }
                 } else if (nCoefs === 2) {
-                    var val = fn.evalOf(0) +
-                                fn.evalOf(self.INTERVAL_WIDTH);
+                    var inc;
+                    var val = fn.evalOf(0) + fn.evalOf(self.INTERVAL_WIDTH);
                     if (val >= 0) {
                         if (fn.coefs[1] > 0) {
-                            inc = $._("increasing and positive");
+                            inc = i18n._("increasing and positive");
                         } else {
-                            inc = $._("decreasing and positive");
+                            inc = i18n._("decreasing and positive");
                         }
                     } else {
                         if (fn.coefs[1] > 0) {
-                            inc = $._("increasing and negative");
+                            inc = i18n._("increasing and negative");
                         } else {
-                            inc = $._("decreasing and negative");
+                            inc = i18n._("decreasing and negative");
                         }
+                    }
+
+                    if (moveDeriv) {
+                        hint = i18n._("The %(nth)s section of the derivative is %(inc)s, " +
+                            "so it corresponds to an original function whose " +
+                            "<b>slope</b> is %(inc)s.", {nth: nth, inc: inc});
+                    } else {
+                        hint = i18n._("The %(nth)s section of the antiderivative has a " +
+                            "%(inc)s slope, so it corresponds to an original " +
+                            "function that is %(inc)s.", {nth: nth, inc: inc});
                     }
                 }
 
-                var hint;
-                if (moveDeriv) {
-                    hint = $._("The %(nth)s section of the derivative is %(inc)s, " +
-                        "so it corresponds to an original function whose " +
-                        "<b>slope</b> is %(inc)s.", {nth: nth, inc: inc});
-                } else {
-                    hint = $._("The %(nth)s section of the antiderivative has a " +
-                        "%(inc)s slope, so it corresponds to an original " +
-                        "function that is %(inc)s.", {nth: nth, inc: inc});
-                }
 
                 var hintproblem = self.problem.slice(i, i + 1);
                 hintproblem.calibrate();
@@ -1038,7 +1047,7 @@ $.extend(KhanUtil, {
 
             var lastHint;
             if (this.noSolution) {
-                lastHint = $._("Because these sections do not appear next " +
+                lastHint = i18n._("Because these sections do not appear next " +
                     "to each other in the graph of <code>f(x)</code>, " +
                     "there is no solution.");
                 hints.push("<p>" + lastHint + "</p>");
@@ -1048,7 +1057,7 @@ $.extend(KhanUtil, {
                                 return "<code>x \\in [" + range.join(", ") + "]</code>";
                             }).join(" and ");
                 var fnVar = moveDeriv ? "f'(x)" : "F(x)";
-                lastHint = $._("The function in the window corresponds to " +
+                lastHint = i18n._("The function in the window corresponds to " +
                     "<code>%(fnVar)s</code> where %(solution)s.",
                     {fnVar: fnVar, solution: solnText});
 
@@ -1159,4 +1168,6 @@ $.extend(KhanUtil, {
 
         this.init();
     }
+});
+
 });

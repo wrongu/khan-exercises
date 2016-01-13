@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <title>One step equation intuition</title>
-    <script src="../khan-exercise.js"></script>
+    <script data-main="../local-only/main.js" src="../local-only/require.js"></script>
     <style>
         div.description {
             border: 1px dashed #aaaaaa;
@@ -32,12 +32,12 @@
             <var id="B">randRange(A + 1, 10)</var>
             <var id="X">B - A</var>
             <var id="UNKNOWN, AVATAR">randFromArray([
-                [$._("Spunky Sam"),         "spunky-sam.png"],
-                [$._("Mr. Pink"),           "mr-pink.png"],
-                [$._("Orange Juice Squid"), "orange-juice-squid.png"],
-                [$._("Purple Pi"),          "purple-pi.png"],
-                [$._("Pants"),              "mr-pants.png"],
-                [$._("Old Spice Man"),      "old-spice-man.png"],
+                [i18n._("Spunky Sam"),         "spunky-sam.png"],
+                [i18n._("Mr. Pink"),           "mr-pink.png"],
+                [i18n._("Orange Juice Squid"), "orange-juice-squid.png"],
+                [i18n._("Purple Pi"),          "purple-pi.png"],
+                [i18n._("Pants"),              "mr-pants.png"],
+                [i18n._("Old Spice Man"),      "old-spice-man.png"],
             ])</var>
         </div>
 
@@ -46,6 +46,7 @@
                 <p class="question">
                     How much does <var>UNKNOWN</var> weigh?
                 </p>
+                <div class="render-answer-area-here"></div>
 
                 <div class="clearfix" style="width: 480px;">
                     <div style="float: left; margin-left: 130px;">
@@ -169,7 +170,7 @@
                 <div style="width: 480px; position: relative; top: -60px; right: 50px;">
                     <div style="text-align: center; float: right;">
                         <a href="#" class="simple-button small-button" onclick="javascript:
-                            KhanUtil.scale.resetProblem();
+                            return KhanUtil.scale.resetProblem();
                         ">reset</a>
                     </div>
                 </div>
@@ -273,11 +274,11 @@
                             return "";
                         }
                         if (guess[1] !== 0) {
-                            return $._("Make sure %(name)s is alone on " +
+                            return i18n._("Make sure %(name)s is alone on " +
                                 "one side of the scale.", {name: UNKNOWN});
                         }
                         if (guess[1] + X !== guess[2]) {
-                            return $._("Make sure the scale is balanced.");
+                            return i18n._("Make sure the scale is balanced.");
                         }
                         return +guess[0] === X;
                     </div>

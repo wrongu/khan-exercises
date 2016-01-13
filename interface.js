@@ -1,11 +1,214 @@
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, comma-spacing, eqeqeq, indent, max-len, no-undef, one-var, prefer-template, space-after-keywords, space-before-function-paren */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
 /**
  * Interface glue to handle events from 'Exercises' and talk to 'Khan' or some
  * Perseus object, whichever is appropriate for the current exercise.
+ *
+ * Specifically, this module does three things:
+ * - listen for DOM click events on various buttons.
+ *
+ *    In the mobile context, these are all triggered programmatically by
+ *    `mobile-client-webview-resources/javascript/
+ *    exercises-package/mobile-exericses.js`.
+ *
+ *   - check answer
+ *   - skip question
+ *   - opt out
+ *   - show next hint
+ *   - show worked example
+ *   - next question
+ *   - toggle scratchpad
+ *
+ * - trigger events for khan-exercises / perseus on the global `Exercises`
+ *   event bus.
+ * - send network requests.
  *
  * In general, khan-exercises and perseus will want to trigger events on
  * Exercises but only listen to their own events.
  */
 (function() {
+
+function saveAttemptToServer(url, attemptData) {
+    // Save the problem results to the server
+    var promise = request(url, attemptData).fail(function(xhr) {
+        // Alert any listeners of the error before reload
+        $(Exercises).trigger("attemptError");
+
+        if (inUnload) {
+            // This path gets called when there is a broken pipe during
+            // page unload- browser navigating away during ajax request
+            // See http://stackoverflow.com/a/1370383.
+            return;
+        }
+
+        // Error during submit. Disable the page and ask users to
+        // reload in an attempt to get updated data.
+
+        // Hide the page so users don't continue, then warn the user about the
+        // problem and encourage reloading the page
+        $("#problem-and-answer").css("visibility", "hidden");
+
+        if (xhr.statusText === "timeout") {
+            // TODO(david): Instead of throwing up this error message, try
+            //     retrying the request or something. See more details in
+            //     comment in request().
+            $(Exercises).trigger("warning",
+                    i18n._("Uh oh, it looks like a network request timed out! " +
+                        "You'll need to " +
+                        "<a href='%(refresh)s'>refresh</a> to continue. " +
+                        "If you think this is a mistake, " +
+                        "<a href='http://www.khanacademy.org/reportissue?" +
+                        "type=Defect'>tell us</a>.",
+                        {refresh: _.escape(window.location.href)}
+                    )
+            );
+        } else {
+            $(Exercises).trigger("warning",
+                    i18n._("This page is out of date. You need to " +
+                        "<a href='%(refresh)s'>refresh</a>, but don't " +
+                        "worry, you haven't lost progress. If you think " +
+                        "this is a mistake, " +
+                        "<a href='http://www.khanacademy.org/reportissue?" +
+                        "type=Defect'>tell us</a>.",
+                        {refresh: _.escape(window.location.href)}
+                    )
+            );
+        }
+
+        // Also log this failure to a bunch of places so we can see
+        // how frequently this occurs, and if it's similar to the frequency
+        // that we used to get for the endless spinner at end of task card
+        // logs.
+        var logMessage = "[" + (+new Date()) + "] request to " +
+            url + " failed (" + xhr.status + ", " + xhr.statusText + ") " +
+            "with " + (Exercises.pendingAPIRequests - 1) +
+            " other pending API requests: " + attemptOrHintQueueUrls +
+            " (in khan-exercises/interface.js:handleAttempt)";
+
+        // Log to app engine logs... hopefully.
+        $.post("/sendtolog", {message: logMessage, with_user: 1});
+
+        // Also log to Sentry via Raven, just for some redundancy in case
+        // the above request doesn't make it to our server somehow.
+        if (window.Raven) {
+            window.Raven.captureMessage(
+                    logMessage, {tags: {ipaddebugging: true}});
+        }
+    });
+    return promise;
+}
+
+/**
+ * An offline-available record of the hints the user has taken.
+ *
+ * Whenever the user takes a hint, we note the exercise and problem number in
+ * this record, who then saves it to local storage. This is done so that we can
+ * detect the case of a user taking a hint offline, then reconnecting.
+ */
+var OfflineHintRecord = {
+    // The local storage key we'll use to store the set
+    LS_KEY: "khan-exercises-interface-persistent-hint-set",
+
+    /**
+     * Creates an item to store in the set for a given problem.
+     *
+     * This function assumes that its arguments are valid (see _areArgsValid
+     * for the definition of "valid").
+     */
+    _makeItem: function(userExercise, problemNumber) {
+        return (
+            userExercise.user + ":" +
+            userExercise.exerciseModel.name + ":" +
+            problemNumber);
+    },
+
+    /**
+     * Returns true if the parameters are valid.
+     *
+     * This is used to make sure we have all the data we need when checking the
+     * hint record, and when we store things in the hint record.
+     */
+    _areArgsValid: function(userExercise, problemNumber) {
+        return (
+            // If we have a unique way to identify the exercise
+            userExercise && userExercise.exerciseModel.name &&
+
+            // If the problem number is useable
+            _.isNumber(problemNumber) &&
+
+            // If we have a unique way to identify the user
+            userExercise && userExercise.user);
+    },
+
+    /**
+     * Returns whether the user has taken a hint for a given problem.
+     *
+     * This accesses information stored in local storage by saveHintTakenForLS.
+     *
+     * Note that if local storage is unavailable, this function will *always*
+     * return false, even if there is a hint on screen right now.
+     */
+    hasTakenHintFor: function(userExercise, problemNumber) {
+        if (!OfflineHintRecord._areArgsValid(userExercise, problemNumber)) {
+            return false;
+        }
+
+        var raw = null;
+        try {
+            raw = localStorage.getItem(OfflineHintRecord.LS_KEY);
+        } catch (e) { /* ignore */ }
+
+        // If we couldn't get anything useful out of local storage, just return
+        // false.
+        if (!raw) {
+            return false;
+        }
+
+        var list = JSON.parse(raw);
+        if (!list) {
+            return false;
+        }
+
+        return _.contains(list, OfflineHintRecord._makeItem(userExercise,
+                                                            problemNumber));
+    },
+
+    /**
+     * Marks that a user has taken a hint for a given problem.
+     *
+     * This stores information in local storage, to be retrieved later by
+     * hasTakenHintFor.
+     *
+     * Note that if local storage is unavailable, this will fail silently.
+     */
+    saveHintTakenFor: function(userExercise, problemNumber) {
+        if (!OfflineHintRecord._areArgsValid(userExercise, problemNumber)) {
+            return false;
+        }
+
+        var raw = null;
+        try {
+            raw = localStorage.getItem(OfflineHintRecord.LS_KEY);
+        } catch (e) { /* ignore */ }
+
+        var list = [];
+        if (raw) {
+            list = JSON.parse(raw) || [];
+        }
+
+        list.push(OfflineHintRecord._makeItem(userExercise, problemNumber));
+
+        // Make sure the list doesn't get too big and make sure all of its
+        // items are unique (this is done as a cheap method of compression).
+        list = _.last(_.unique(list), 40);
+        try {
+            localStorage.setItem(OfflineHintRecord.LS_KEY,
+                                 JSON.stringify(list));
+        } catch(e) { /* ignore */ }
+    },
+};
 
 // If any of these properties have already been defined, then leave them --
 // this happens in local mode
@@ -15,18 +218,36 @@ _.defaults(Exercises, {
     getCurrentFramework: function(userExerciseOverride) {
         return (userExerciseOverride || userExercise).exerciseModel.fileName ?
             "khan-exercises" : "perseus";
-    }
+    },
+
+    requestTimeoutMillis: 30000
 });
 
 _.extend(Exercises, {
     guessLog: undefined,
-    userActivityLog: undefined
+    userActivityLog: undefined,
+
+    // These functions allow a client to interact imperatively with the
+    // exercises machinery, instead of simulating button clicks, listening for
+    // events, etc.
+    imperativeAPI: {
+        handleAttempt: handleAttempt,
+    },
 });
+
+// The iOS app doesn't use cookies, so we need to send this as an oauth request
+// (while letting the webapp send its AJAX request as before).
+$.kaOauthAjax = function (options) {
+    if ($.oauth) {
+        return $.oauth(options);
+    } else {
+        return $.ajax(options);
+    }
+};
 
 var PerseusBridge = Exercises.PerseusBridge,
 
-    EMPTY_MESSAGE = $._("It looks like you haven't answered all of the " +
-        "question yet."),
+    EMPTY_MESSAGE = i18n._("There are still more parts of this question to answer."),
 
     // Store these here so that they're hard to change after the fact via
     // bookmarklet, etc.
@@ -55,6 +276,7 @@ $(Exercises)
     .bind("upcomingExercise", upcomingExercise)
     .bind("gotoNextProblem", gotoNextProblem)
     .bind("updateUserExercise", updateUserExercise)
+    .bind("subhintExpand", subhintExpand)
     .bind("clearExistingProblem", clearExistingProblem)
     .bind("showOptOut", showOptOut);
 
@@ -85,6 +307,9 @@ function problemTemplateRendered() {
     // Hint button
     $("#hint").click(onHintButtonClicked);
 
+    // Worked example button
+    $("#worked-example-button").click(onShowExampleClicked);
+
     // Next question button
     $("#next-question-button").click(function() {
         $(Exercises).trigger("gotoNextProblem");
@@ -113,13 +338,13 @@ function problemTemplateRendered() {
         Khan.scratchpad.toggle();
 
         if (!localMode && userExercise.user) {
-            window.localStorage["scratchpad:" + userExercise.user] =
-                    Khan.scratchpad.isVisible();
+            LocalStore.set("scratchpad:" + userExercise.user,
+                    Khan.scratchpad.isVisible());
         }
     });
 
     // These shouldn't interfere...
-    $(PerseusBridge).trigger("problemTemplateRendered");
+    $(PerseusBridge).trigger("problemTemplateRendered", [Khan.mathJaxLoaded]);
     $(Khan).trigger("problemTemplateRendered");
 }
 
@@ -147,34 +372,85 @@ function newProblem(e, data) {
     $("#hint").attr("disabled", hintsUsed >= numHints);
     enableCheckAnswer();
 
-    // Render related videos, unless we're on the final stage of mastery.
-    if (data.userExercise) {
+    if (typeof KA !== "undefined" && KA.language === "en-PT" &&
+            previewingItem) {
+        // On translate.ka.org when previewing the exercise, we want to open up
+        // all the hints to make it easy to translate immediately.
+        while (hintsUsed < numHints) {
+            onHintButtonClicked();
+        }
+    }
+
+    // Check whether the user has taken hints offline that we don't already
+    // know about (note that the call to hasTakenHintFor will validate its
+    // args and return false if there's no userExercise or the problemNum is
+    // non-numeric).
+    if (hintsUsed === 0 && numHints > 0 &&
+            OfflineHintRecord.hasTakenHintFor(data.userExercise, problemNum)) {
+        onHintButtonClicked();
+    }
+
+    // Render related videos, unless we're on the final stage of mastery or in
+    // a skill check.
+    if (Exercises.RelatedVideos && data.userExercise) {
         var userExercise = data.userExercise;
         var nearMastery = userExercise.exerciseProgress.level === "mastery2" ||
                 userExercise.exerciseProgress.level === "mastery3";
         var task = Exercises.learningTask;
-        var hideRelatedVideos = task && task.isMasteryTask() && nearMastery;
+        var hideRelatedVideos = (task && task.isMasteryTask() && nearMastery ||
+            userExercise.isSkillCheck);
+        var relatedVideos = data.userExercise.exerciseModel.relatedVideos;
+
+        // We have per-problem-type related videos for Perseus
+        if (framework === "perseus") {
+            var problemTypeName = PerseusBridge.getSeedInfo().problem_type;
+
+            // Filter out related videos that correspond to other problem types
+            var problemTypes = data.userExercise.exerciseModel.problemTypes;
+            var otherProblemTypes = _.filter(problemTypes, function(type) {
+                return type.name !== problemTypeName;
+            });
+            relatedVideos = _.filter(relatedVideos, function(video) {
+                return _.all(otherProblemTypes, function(problemType) {
+                    // Note: we have to cast IDs to strings for backwards
+                    // compatability as older videos have pure integer IDs.
+                    var stringIDs = _.map(problemType.relatedVideos,
+                        function(id) {
+                            return "" + id;
+                        });
+                    return !_.contains(stringIDs, "" + video.id);
+                });
+            });
+        }
 
         if (hideRelatedVideos) {
             Exercises.RelatedVideos.render([]);
         } else {
-            Exercises.RelatedVideos.render(
-                    data.userExercise.exerciseModel.relatedVideos);
+            Exercises.RelatedVideos.render(relatedVideos);
         }
     }
 }
 
 function handleCheckAnswer() {
-    return handleAttempt({skipped: false});
+    return handleAttemptEvent({skipped: false});
 }
 
 function handleSkippedQuestion() {
-    return handleAttempt({skipped: true});
+    return handleAttemptEvent({skipped: true});
 }
 
 function handleOptOut() {
     Exercises.AssessmentQueue.end();
-    return handleAttempt({skipped: true, optOut: true});
+    return handleAttemptEvent({skipped: true, optOut: true});
+}
+
+function handleAttemptEvent(data) {
+    // NOTE(jared): The return value of handleAttempt was added to accommodate
+    // an imperative (as opposed to event-based) API. handleAttemptEvent is
+    // used to respond to DOM events, and so returns `false` to cancel the
+    // event.
+    handleAttempt(data);
+    return false;
 }
 
 function handleAttempt(data) {
@@ -182,34 +458,70 @@ function handleAttempt(data) {
     var skipped = data.skipped;
     var optOut = data.optOut;
     var score;
+    var itemId;
 
+    // Score the attempt
     if (framework === "perseus") {
         score = PerseusBridge.scoreInput();
+        itemId = PerseusBridge.getSeedInfo().seed;
     } else if (framework === "khan-exercises") {
         score = Khan.scoreInput();
+        itemId = Khan.getSeedInfo().seed;
     }
 
     if (!canAttempt) {
         // Just don't allow further submissions once a correct answer or skip
         // has been called or sometimes the server gets confused.
-        return false;
+        return {
+            status: "problem-already-answered",
+        };
     }
 
     var isAnswerEmpty = score.empty && !skipped;
+    var attemptMessage = null;
 
-    // Is this a message to be shown?
+    // When the user answers incorrectly, we might show a message in response.
+    // It might encourage the user to think about their answer's format (eg.
+    // simplify the fraction) or it might explain to the user why the answer
+    // was wrong (these are referred to as clues in code, though in
+    // conversation we call them rationales). We show nothing at all if that
+    // content doesn't exist.
     if (score.message != null) {
-        $("#check-answer-results > p").html(score.message).show().tex();
+        attemptMessage = score.message;
     } else if (isAnswerEmpty) {
-        $("#check-answer-results > p").html(EMPTY_MESSAGE).show().tex();
+        attemptMessage = EMPTY_MESSAGE;
+    }
+
+    // We need to alert the user when the given answer is incorrect
+    if (!attemptMessage && !(score.correct || skipped)) {
+        attemptMessage = i18n._("Incorrect answer, please try again.");
+    }
+
+    var $attemptMessage = $("#check-answer-results > p");
+
+    if (attemptMessage) {
+        // NOTE(jeresig): If the message is identical to the message that
+        // was there before then the ARIA alert is not triggered. We add in
+        // an extra space to force the alert to trigger.
+        var isIdentical = attemptMessage === $attemptMessage.text();
+
+        $attemptMessage
+            .html(attemptMessage + (isIdentical ? " " : "")).show().tex();
+
+        $(Exercises).trigger("attemptMessageShown", attemptMessage);
     } else {
-        $("#check-answer-results > p").hide();
+        $attemptMessage.hide();
     }
 
     // Stop if the user didn't try to skip the question and also didn't yet
     // enter a response
     if (isAnswerEmpty) {
-        return false;
+        return {
+            status: "incomplete-answer",
+            data: {
+                attemptMessage: attemptMessage,
+            },
+        };
     }
 
     if (score.correct || skipped) {
@@ -228,8 +540,14 @@ function handleAttempt(data) {
     // If user hasn't changed their answer and is resubmitting w/in one second
     // of last attempt, don't allow this attempt. They're probably just
     // smashing Enter.
-    if (stringifiedGuess === lastAttemptContent && millisTaken < 1000) {
-        return false;
+    if (!skipped &&
+            stringifiedGuess === lastAttemptContent && millisTaken < 1000) {
+        return {
+            status: "too-fast",
+            data: {
+                attemptMessage: attemptMessage,
+            },
+        };
     }
     lastAttemptContent = stringifiedGuess;
 
@@ -238,12 +556,29 @@ function handleAttempt(data) {
             score.correct ? "correct-activity" : "incorrect-activity",
             stringifiedGuess, timeTaken]);
 
-    if (score.correct) {
+    var isDone = score.correct || skipped;
+    if (isDone) {
         $(Exercises).trigger("problemDone", {
             card: Exercises.currentCard,
             attempts: attempts
         });
     }
+
+    var checkAnswerData = {
+        attemptMessage: attemptMessage,
+        isDone: isDone,
+        attempts: attempts,
+        correct: score.correct,
+        item: itemId,
+        card: Exercises.currentCard,
+        optOut: optOut,
+        // Determine if this attempt qualifies as fast completion
+        fast: !localMode && userExercise.secondsPerFastProblem >= timeTaken,
+        // Used by mobile for skipping problems in a mastery task
+        skipped: skipped
+    };
+
+    $(Exercises).trigger("checkAnswer", checkAnswerData);
 
     // Update interface corresponding to correctness
     if (skipped || Exercises.assessmentMode) {
@@ -251,9 +586,17 @@ function handleAttempt(data) {
     } else if (score.correct) {
         // Correct answer, so show the next question button.
         $("#check-answer-button").hide();
+        var nextButtonText;
+        if (Exercises.learningTask &&  Exercises.learningTask.isComplete()) {
+            nextButtonText = i18n._("Awesome! Show points...");
+        } else {
+            nextButtonText = i18n._("Correct! Next question...");
+        }
+
         $("#next-question-button")
             .prop("disabled", false)
             .removeClass("buttonDisabled")
+            .val(nextButtonText)
             .show()
             .focus();
         $("#positive-reinforcement").show();
@@ -262,15 +605,22 @@ function handleAttempt(data) {
     } else {
         // Wrong answer. Enable all the input elements
 
-        $("#check-answer-button")
-            .parent()  // .check-answer-wrapper makes shake behave
-            .effect("shake", {times: 3, distance: 5}, 480)
-            .val($._("Try Again"));
+        // NOTE(jeresig): The wrong answer wiggling has been disabled as
+        // it causes a re-focus on the answer button to occur, making it
+        // impossible to hear what the effect of the press was in a
+        // screen reader.
+        //$("#check-answer-button")
+            //.parent()  // .check-answer-wrapper makes shake behave
+            //.effect("shake", {times: 3, distance: 5}, 480);
 
         if (framework === "perseus") {
             // TODO(alpert)?
         } else if (framework === "khan-exercises") {
-            $(Khan).trigger("refocusSolutionInput");
+            // NOTE(jeresig): Auto-focusing back on to the input when an
+            // incorrect answer is given has been disabled. It didn't
+            // happen when using the mouse and if you used the keyboard
+            // it made the screen reader really confused.
+            //$(Khan).trigger("refocusSolutionInput");
         }
     }
 
@@ -288,25 +638,35 @@ function handleAttempt(data) {
         updateHintButtonText();
     }
 
-    $(Exercises).trigger("checkAnswer", {
-        correct: score.correct,
-        card: Exercises.currentCard,
-        optOut: optOut,
-        // Determine if this attempt qualifies as fast completion
-        fast: !localMode && userExercise.secondsPerFastProblem >= timeTaken
-    });
-
     if (localMode || Exercises.currentCard.get("preview")) {
         // Skip the server; just pretend we have success
-        return false;
+        return {
+            status: "skip-server",
+            data: checkAnswerData,
+        };
     }
 
     if (previewingItem) {
         $("#next-question-button").prop("disabled", true);
 
         // Skip the server; just pretend we have success
-        return false;
+        return {
+            status: "previewing",
+            data: checkAnswerData,
+        };
     }
+
+    // If we're in a practice task but not at the end of it (so the
+    // user will be doing another question next), let's make the
+    // request on the multithreaded module: we don't care that much
+    // how long the request takes (it happens while the user is trying
+    // the next question) and it's cheaper.
+    var useMultithreadedModule = (
+        !score.correct ||
+        (Exercises.learningTask && !Exercises.learningTask.isComplete()));
+
+    var url = fullUrl(
+            "problems/" + problemNum + "/attempt", useMultithreadedModule);
 
     // This needs to be after all updates to Exercises.currentCard (such as the
     // "problemDone" event) or it will send incorrect data to the server
@@ -314,36 +674,7 @@ function handleAttempt(data) {
             score.correct, ++attempts, stringifiedGuess, timeTaken, skipped,
             optOut);
 
-    // Save the problem results to the server
-    var requestUrl = "problems/" + problemNum + "/attempt";
-    request(requestUrl, attemptData).fail(function(xhr) {
-        // Alert any listeners of the error before reload
-        $(Exercises).trigger("attemptError");
-
-        if (xhr && xhr.readyState === 0) {
-            // This path gets called when there is a broken pipe during
-            // page unload- browser navigating away during ajax request
-            // See http://stackoverflow.com/a/1370383.
-            return;
-        }
-
-        // Error during submit. Disable the page and ask users to
-        // reload in an attempt to get updated data.
-
-        // Hide the page so users don't continue, then warn the user about the
-        // problem and encourage reloading the page
-        $("#problem-and-answer").css("visibility", "hidden");
-        $(Exercises).trigger("warning",
-                $._("This page is out of date. You need to " +
-                    "<a href='%(refresh)s'>refresh</a>, but don't " +
-                    "worry, you haven't lost progress. If you think " +
-                    "this is a mistake, " +
-                    "<a href='http://www.khanacademy.org/reportissue?" +
-                    "type=Defect'>tell us</a>.",
-                    {refresh: _.escape(window.location.href)}
-                )
-        );
-    });
+    saveAttemptToServer(url, attemptData);
 
     if (skipped && !Exercises.assessmentMode) {
         // Skipping should pull up the next card immediately - but, if we're in
@@ -362,17 +693,18 @@ function handleAttempt(data) {
             Exercises.AssessmentQueue.answered(score.correct);
         },10);
     }
-    return false;
+    return {
+        status: "normal",
+        data: checkAnswerData,
+    };
 }
 
-function onHintButtonClicked() {
-    var framework = Exercises.getCurrentFramework();
-
-    if (framework === "perseus") {
-        $(PerseusBridge).trigger("showHint");
-    } else if (framework === "khan-exercises") {
-        $(Khan).trigger("showHint");
-    }
+/**
+ * Handle the even when a user wants to see a worked example.
+ * Currently only works on some Perseus problems.
+ */
+function onShowExampleClicked() {
+    $(PerseusBridge).trigger("showWorkedExample");
 }
 
 /**
@@ -383,6 +715,48 @@ function onHintButtonClicked() {
  * other parts of the UI may update first. It's separated into two events so
  * that the XHR can be sent after the other items have a chance to respond.
  */
+function onHintButtonClicked() {
+    var curTime = new Date().getTime();
+    var timeTaken = Math.round((curTime - lastAttemptOrHint) / 1000);
+    lastAttemptOrHint = curTime;
+    var logEntry = ["hint-activity", "0", timeTaken];
+    Exercises.userActivityLog.push(logEntry);
+
+    if (!previewingItem && !localMode && !userExercise.readOnly &&
+            !Exercises.currentCard.get("preview") && canAttempt) {
+
+        // buildAttemptData reads the number of hints we have taken
+        // from hintsUsed.  However, we haven't updated that yet since
+        // we haven't gotten a response back, from, you guessed it,
+        // this request itself. So we increment hintsUsed while
+        // forming this request so that it gets the number of hints
+        // that will have been used when this request returns
+        // successfully.
+        hintsUsed++;
+        // Always put hints on the (cheaper) multithreaded module,
+        // since we don't care what the API call returns so we don't
+        // care how slow it is.
+        var url = fullUrl("problems/" + problemNum + "/hint", true);
+        var attemptData = buildAttemptData(false, attempts, "hint",
+                                           timeTaken, false, false);
+        request(url, attemptData);
+        hintsUsed--;
+    }
+
+    // Save the fact that the user has taken a hint for this problem in local
+    // storage to help with cheating (note that the args are validated in the
+    // function and this will no-op if there's no userExercise or the problem
+    // num is non-numeric).
+    OfflineHintRecord.saveHintTakenFor(userExercise, problemNum);
+
+    var framework = Exercises.getCurrentFramework();
+    if (framework === "perseus") {
+        $(PerseusBridge).trigger("showHint");
+    } else if (framework === "khan-exercises") {
+        $(Khan).trigger("showHint");
+    }
+}
+
 function onHintShown(e, data) {
     // Grow the scratchpad to cover the new hint
     Khan.scratchpad.resize();
@@ -394,27 +768,13 @@ function onHintShown(e, data) {
     // If there aren't any more hints, disable the get hint button
     if (hintsUsed === numHints) {
         $("#hint").attr("disabled", true);
-        $(Exercises).trigger("allHintsUsed");
     }
-
-    var curTime = new Date().getTime();
-    var timeTaken = Math.round((curTime - lastAttemptOrHint) / 1000);
-    lastAttemptOrHint = curTime;
 
     // When a hint is shown, clear the "last attempt content" that is used to
     // detect duplicate, repeated attempts. Once the user clicks on a hint, we
     // consider their next attempt to be unique and legitimate even if it's the
     // same answer they attempted previously.
     lastAttemptContent = null;
-
-    Exercises.userActivityLog.push(["hint-activity", "0", timeTaken]);
-
-    if (!previewingItem && !localMode && !userExercise.readOnly &&
-            !Exercises.currentCard.get("preview") && canAttempt) {
-        // Don't do anything on success or failure; silently failing is ok here
-        request("problems/" + problemNum + "/hint",
-                buildAttemptData(false, attempts, "hint", timeTaken, false, false));
-    }
 }
 
 function updateHintButtonText() {
@@ -423,14 +783,14 @@ function updateHintButtonText() {
 
     if (hintsAreFree) {
         $hintButton.val(hintsUsed ?
-                $._("Show next hint (%(hintsLeft)s left)", {hintsLeft: hintsLeft}) :
-                $._("Show hints (%(hintsLeft)s available)", {hintsLeft: hintsLeft}));
+                i18n._("Show next hint (%(hintsLeft)s left)", {hintsLeft: hintsLeft}) :
+                i18n._("Show hints (%(hintsLeft)s available)", {hintsLeft: hintsLeft}));
     } else {
         $hintButton.val(hintsUsed ?
-                $.ngettext("I'd like another hint (1 hint left)",
+                i18n.ngettext("I'd like another hint (1 hint left)",
                            "I'd like another hint (%(num)s hints left)",
                            hintsLeft) :
-                $._("I'd like a hint"));
+                i18n._("I'd like a hint"));
     }
 }
 
@@ -451,7 +811,7 @@ function buildAttemptData(correct, attemptNum, attemptContent, timeTaken,
         casing: "camel",
 
         // Whether we're moving to the next problem (i.e., correctness)
-        complete: correct ? 1 : 0,
+        complete: (correct || skipped) ? 1 : 0,
 
         count_hints: hintsUsed,
         time_taken: timeTaken,
@@ -462,29 +822,21 @@ function buildAttemptData(correct, attemptNum, attemptContent, timeTaken,
         // The answer the user gave
         attempt_content: attemptContent,
 
-        // Whether we are currently working on a topic, as opposed to an exercise
-        topic_mode: Exercises.practiceMode ? 0 : 1,
-
         // If working in the context of a LearningTask (on the new learning
         // dashboard), supply the task ID.
-        task_id: Exercises.learningTask && Exercises.learningTask.get("id"),
+        // TODOX(laura): The web view in the iOS app doesn't have a learningTask
+        // object on Exercises. To simplify this line, add getTaskId to
+        // Exercises on the webapp as well.
+        task_id: (Exercises.getTaskId && Exercises.getTaskId()) ||
+                (Exercises.learningTask && Exercises.learningTask.get("id")),
+
+        task_generation_time: (Exercises.learningTask &&
+                Exercises.learningTask.get("generationTime")),
 
         user_mission_id: Exercises.userMissionId,
 
-        // The current card data
-        card: JSON.stringify(Exercises.currentCard),
-
-        // Unique ID of the cached stack
-        stack_uid: Exercises.completeStack.getUid(),
-
         // The current topic, if any
-        topic_slug: Exercises.topic && Exercises.topic.get("slug"),
-
-        // How many cards the user has already done
-        cards_done: Exercises.completeStack.length,
-
-        // How many cards the user has left to do
-        cards_left: Exercises.incompleteStack.length - 1,
+        topic_slug: Exercises.topicSlug,
 
         // The user assessment key if in assessmentMode
         user_assessment_key: Exercises.userAssessmentKey,
@@ -493,40 +845,93 @@ function buildAttemptData(correct, attemptNum, attemptContent, timeTaken,
         skipped: skipped ? 1 : 0,
 
         // Whether the user is opting out of the task
-        opt_out: optOut ? 1 : 0
+        opt_out: optOut ? 1 : 0,
+
+        // The client-reported datetime in local time (not UTC!).
+        // Used by streaks.
+        client_dt: moment().format()
     });
 
     return data;
 }
 
 
-var attemptHintQueue = jQuery({});
+var inUnload = false;
+
+$(window).on("beforeunload", function() {
+    inUnload = true;
+});
 
 // If there are any requests left in the queue when the window unloads then we
 // will have permanently lost their answers and will need to clear the session
 // cache, to make sure we don't override what is passed down from the servers
 $(window).unload(function() {
-    if (attemptHintQueue.queue().length) {
+    if (attemptOrHintQueue.queue().length) {
         $(Exercises).trigger("attemptError");
     }
 });
 
-function request(method, data) {
-    var apiBaseUrl = (Exercises.assessmentMode ?
-            "/api/v1/user/assessment/exercises" : "/api/v1/user/exercises");
+function fullUrl(method, useMultithreadedModule) {
+    // The multithreaded module is slower but cheaper.  We use it for
+    // all hints, and problem-attempts that we know are not the last
+    // attempt in a task.  (This is because it usually takes people at
+    // least a few seconds to read a hint or attempt the next problem,
+    // which is plenty of time even when on the slower module.)
+    var apiBaseUrl;
+    if (Exercises.assessmentMode && useMultithreadedModule) {
+        apiBaseUrl = "/api/internal/_mt/user/assessment/exercises";
+    } else if (Exercises.assessmentMode) {
+        apiBaseUrl = "/api/internal/user/assessment/exercises";
+    } else if (useMultithreadedModule) {
+        apiBaseUrl = "/api/internal/_mt/user/exercises";
+    } else {
+        apiBaseUrl = "/api/internal/user/exercises";
+    }
 
+    return apiBaseUrl + "/" + userExercise.exerciseModel.name + "/" + method;
+}
+
+var attemptOrHintQueue = jQuery({});
+// Used for error reporting: what urls are in the queue when an error happens?
+var attemptOrHintQueueUrls = [];
+
+function request(url, data) {
     var params = {
         // Do a request to the server API
-        url: apiBaseUrl + "/" + userExercise.exerciseModel.name + "/" + method,
+        url: url,
         type: "POST",
         data: data,
-        dataType: "json"
+        dataType: "json",
+
+        // If we don't receive a response within this many milliseconds, we
+        // throw up an error (the red bar) and prevent the user from
+        // continuing. Why do we timeout requests? Dropped requests seem to be
+        // a real thing and causes problems. First, a dropped request is bad by
+        // itself, but also prevents any future requests from being sent
+        // because we queue up requests on the client. Also, before we render
+        // the end-of-task card, we wait for all requests to return, and if
+        // there's a dropped request, we throw up a spinner that spins forever.
+        // This is a real problem that we were first made aware of from iPad
+        // Safari users in classrooms. We also added logging after 60 seconds
+        // of waiting for all requests to return at the pre-end-of-task card
+        // spinner, and it occurs frequently (several times every minute).
+        // Though it would be good to retry requests, that's going to be
+        // slightly tricker to do to ensure the server can be idempotent or be
+        // able to handle multiple requests. So for now, we are just showing
+        // the red error bar, which, although jarring, is hopefully less bad
+        // than being stuck with an endless spinner before the end of task
+        // card and then losing all progress since the first dropped request.
+        timeout: Exercises.requestTimeoutMillis
     };
 
     var deferred = $.Deferred();
 
-    attemptHintQueue.queue(function(next) {
-        $.ajax(params).then(function(data, textStatus, jqXHR) {
+    attemptOrHintQueue.queue(function(next) {
+        var requestEndedParameters;
+
+        attemptOrHintQueueUrls.push(params.url);
+        $.kaOauthAjax(params).then(function(data, textStatus, jqXHR) {
+            // This line calls any callbacks registered with the promise
             deferred.resolve(data, textStatus, jqXHR);
 
             // Tell any listeners that we now have new userExercise data
@@ -535,16 +940,31 @@ function request(method, data) {
                 source: "serverResponse"
             });
         }, function(jqXHR, textStatus, errorThrown) {
-            // Execute passed error function first in case it wants different
-            // behavior depending upon the length of the request queue
-            // TODO(alpert): Huh? Don't think this matters.
+            // Execute passed error function first in case it wants
+            // to log the request queue or something like that.
             deferred.reject(jqXHR, textStatus, errorThrown);
 
             // Clear the queue so we don't spit out a bunch of queued up
-            // requests after the error
-            attemptHintQueue.clearQueue();
+            // requests after the error.
+            // TODO(csilvers): do we need to call apiRequestEnded for
+            // all these as well?  Exercises.pendingAPIRequests is now off.
+            attemptOrHintQueue.clearQueue();
+            attemptOrHintQueueUrls = [];
+
+            requestEndedParameters = {
+                "error": {
+                    textStatus: textStatus,
+                    errorThrown: errorThrown
+                }
+            };
         }).always(function() {
-            $(Exercises).trigger("apiRequestEnded");
+            var attemptedUrl = attemptOrHintQueueUrls.pop();
+            // Sanity check.  attemptedUrl will be undefined on send-error.
+            if (attemptedUrl && attemptedUrl !== params.url) {
+                KhanUtil.debugLog("We just sent " + params.url + " but " +
+                                  attemptedUrl + " was at queue-front!");
+            }
+            $(Exercises).trigger("apiRequestEnded", requestEndedParameters);
             next();
         });
     });
@@ -556,7 +976,6 @@ function request(method, data) {
 
     return deferred.promise();
 }
-
 
 function readyForNextProblem(e, data) {
     userExercise = data.userExercise;
@@ -639,7 +1058,7 @@ function disableCheckAnswer() {
     $("#check-answer-button")
         .prop("disabled", true)
         .addClass("buttonDisabled")
-        .val($._("Please wait..."));
+        .val(i18n._("Please wait..."));
 
     $("#skip-question-button")
         .prop("disabled", true)
@@ -650,17 +1069,27 @@ function disableCheckAnswer() {
         .addClass("buttonDisabled");
 }
 
+function subhintExpand(e, subhintName) {
+    // write to KALOG capturing the subhint-expand
+    // click
+    if (!localMode) {
+        $.post("/api/internal/misc/subhint_expand", {
+            subhintName: subhintName
+        });
+    }
+}
+
 function clearExistingProblem() {
     $("#happy").hide();
-    if (!$("#examples-show").data("show")) {
-        // TODO(alpert): What does this do?
-        $("#examples-show").click();
-    }
 
     // Toggle the navigation buttons
     $("#check-answer-button").show();
     $("#next-question-button").blur().hide();
     $("#positive-reinforcement").hide();
+
+    // #solutionarea might have been moved by makeProblem(), so put it back
+    // to the default location (which is also where Perseus expects it to be)
+    $(".solutionarea-placeholder").after($("#solutionarea"));
 
     // Wipe out any previous problem
     PerseusBridge.cleanupProblem() || Khan.cleanupProblem();
@@ -674,7 +1103,7 @@ function clearExistingProblem() {
     $("#hint")
         .removeClass("green")
         .addClass("orange")
-        .val($._("I'd like a hint"))
+        .val(i18n._("I'd like a hint"))
         .data("buttonText", false)
         .appendTo("#get-hint-button-container");
     $(".hint-box")

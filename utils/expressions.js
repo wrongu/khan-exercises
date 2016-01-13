@@ -1,3 +1,9 @@
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, eqeqeq, indent, max-len, no-undef, no-unused-vars, one-var, prefer-template, space-unary-ops */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
+define(function(require) {
+
 $.extend(KhanUtil, {
 
     expr: function(expr, compute) {
@@ -496,3 +502,5 @@ $.extend(KhanUtil, {
 });
 
 KhanUtil.computeOperators["frac"] = KhanUtil.computeOperators["/"];
+
+});

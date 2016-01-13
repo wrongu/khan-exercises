@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <title>Dividing fractions word problems 2</title>
-    <script src="../khan-exercise.js"></script>
+    <script data-main="../local-only/main.js" src="../local-only/require.js"></script>
 </head>
 <body>
     <div class="exercise">
@@ -17,17 +17,17 @@
                     </div>
                     <var id="PIECES">randRange(2, 5) * N</var>
                     <var id="SOLUTION">PIECES * D / N</var>
-                    <var id="CANDY_BARS">$._("candy bars")</var>
-                    <var id="BAR_PER_PERSON">$._("bar per person")</var>
-                    <var id="TOTAL_PEOPLE">$._("total people")</var>
-                    <var id="PEOPLE_PER_BAR">$._("people per bar")</var>
-                    <var id="PEOPLE">$._("people")</var>
+                    <var id="CANDY_BARS">i18n._("candy bars")</var>
+                    <var id="BAR_PER_PERSON">i18n._("bar per person")</var>
+                    <var id="TOTAL_PEOPLE">i18n._("total people")</var>
+                    <var id="PEOPLE_PER_BAR">i18n._("people per bar")</var>
+                    <var id="PEOPLE">i18n._("people")</var>
                 </div>
 
                 <p class="problem" data-if="isMale(1)">
                     <span class="spin">
                         {Many|All|Several} of <var>person(1)</var>'s friends wanted to try the candy bars
-                        he brought back from his trip, but there were only <var>PIECES</var> candy bars.
+                        he brought back from his trip, but there were only <code><var>PIECES</var></code> candy bars.
                     </span>
                     <var>person(1)</var> decided to cut the candy bars into pieces so that each person could have
                     <code>\frac{<var>N</var>}{<var>D</var>}</code> of a candy bar.
@@ -35,24 +35,28 @@
                 <p class="problem" data-else="">
                     <span class="spin">
                         {Many|All|Several} of <var>person(1)</var>'s friends wanted to try the candy bars
-                        she brought back from her trip, but there were only <var>PIECES</var> candy bars.
+                        she brought back from her trip, but there were only <code><var>PIECES</var></code> candy bars.
                     </span>
                     <var>person(1)</var> decided to cut the candy bars into pieces so that each person could have
                     <code>\frac{<var>N</var>}{<var>D</var>}</code> of a candy bar.
                 </p>
 
-                <p class="question" data-if="isMale(1)">After cutting up the candy bars, how many friends could <var>person(1)</var> share his candy with?</p>
-                <p class="question" data-else="">After cutting up the candy bars, how many friends could <var>person(1)</var> share her candy with?</p>
+                <p class="question" data-if="isMale(1)">
+                    After cutting up the candy bars, to how many friends could <var>person(1)</var> give his candy, assuming he didn't eat any?
+                </p>
+                <p class="question" data-else="">
+                    After cutting up the candy bars, to how many friends could <var>person(1)</var> give her candy, assuming she didn't eat any?
+                </p>
                 <div class="solution"><var>SOLUTION</var></div>
 
                 <div class="hints">
                     <p data-if="isMale(1)">
                         We can divide the number of candy bars (<code><var>PIECES</var></code>) by the amount <var>person(1)</var> gave to each person
-                        (<code>\frac{<var>N</var>}{<var>D</var>}</code> of a bar) to find out how many people he could share with.
+                        (<code>\frac{<var>N</var>}{<var>D</var>}</code> of a bar) to find out how many people he could give a piece to.
                     </p>
                     <p data-else="">
                         We can divide the number of candy bars (<code><var>PIECES</var></code>) by the amount <var>person(1)</var> gave to each person
-                        (<code>\frac{<var>N</var>}{<var>D</var>}</code> of a bar) to find out how many people she could share with.
+                        (<code>\frac{<var>N</var>}{<var>D</var>}</code> of a bar) to find out how many people she could give a piece to.
                     </p>
                     <p><code>
                         \dfrac{\red{<var>PIECES</var> \text{ <var>CANDY_BARS</var>}}}
@@ -69,8 +73,11 @@
                         = \green{\text{<var>TOTAL_PEOPLE</var>}}
                     </code></p>
                     <p><code>\green{\dfrac{<var>D * PIECES</var>}{<var>N</var>}\text{ <var>PEOPLE</var>}} = <var>SOLUTION</var>\text{ <var>PEOPLE</var>}</code></p>
-                    <p data-if="isMale(1)">By cutting up the candy bars, <var>person(1)</var> could share his candy with <var>SOLUTION</var> of his friends.</p>
-                    <p data-else="">By cutting up the candy bars, <var>person(1)</var> could share her candy with <var>SOLUTION</var> of her friends.</p>
+                    <p data-if="isMale(1)">
+                        By cutting up the candy bars, <var>person(1)</var> could give his candy to <code><var>SOLUTION</var></code> of his friends.
+                    </p><p data-else="">
+                        By cutting up the candy bars, <var>person(1)</var> could give her candy to <code><var>SOLUTION</var></code> of her friends.
+                    </p>
                 </div>
             </div>
 
@@ -82,35 +89,38 @@
                     </div>
                     <var id="YARN">randRange( 3, 6 ) * N</var>
                     <var id="SOLUTION">YARN * D / N</var>
-                    <var id="BALLS_OF_YARN">$._("balls of yarn")</var>
-                    <var id="BALL_PER_SCARF">$._("ball per scarf")</var>
-                    <var id="NUMBER_OF_SCARVES">$._("number of scarves")</var>
-                    <var id="SCARVES_PER_BALL">$._("scarves per ball")</var>
-                    <var id="SCARVES">$._("scarves")</var>
+                    <var id="BALLS_OF_YARN">i18n._("balls of yarn")</var>
+                    <var id="BALL_PER_SCARF">i18n._("ball per scarf")</var>
+                    <var id="NUMBER_OF_SCARVES">i18n._("number of scarves")</var>
+                    <var id="SCARVES_PER_BALL">i18n._("scarves per ball")</var>
+                    <var id="SCARVES">i18n._("scarves")</var>
                 </div>
 
                 <p class="problem" data-if="isMale(1)">
                     <span class="spin">
-                        <var>person(1)</var> just found beautiful yarn {for <var>randFromArray([5,20])</var> percent off }at
+                        <var>person(1)</var> just found beautiful yarn {for <code><var>randFromArray([5,20])</var> \%</code> off }at
                         his favorite yarn store.
                     </span>
-                    He can make 1 scarf from <code>\frac{<var>N</var>}{<var>D</var>}</code> of a ball of yarn.
+                    He can make one scarf from <code>\frac{<var>N</var>}{<var>D</var>}</code> of a ball of yarn.
                 </p><p class="problem" data-else="">
                     <span class="spin">
-                        <var>person(1)</var> just found beautiful yarn {for <var>randFromArray([5,20])</var> percent off }at
+                        <var>person(1)</var> just found beautiful yarn {for <code><var>randFromArray([5,20])</var> \%</code> off }at
                         her favorite yarn store.
                     </span>
-                    She can make 1 scarf from <code>\frac{<var>N</var>}{<var>D</var>}</code> of a ball of yarn.
+                    She can make one scarf from <code>\frac{<var>N</var>}{<var>D</var>}</code> of a ball of yarn.
                 </p>
 
-                <p class="question" data-if="isMale(1)">If <var>person(1)</var> buys <var>YARN</var> balls of yarn, how many scarves can he make?</p>
-                <p class="question" data-else="">If <var>person(1)</var> buys <var>YARN</var> balls of yarn, how many scarves can she make?</p>
+                <p class="question" data-if="isMale(1)">
+                    If <var>person(1)</var> buys <code><var>YARN</var></code> balls of yarn, how many scarves can he make?
+                </p><p class="question" data-else="">
+                    If <var>person(1)</var> buys <code><var>YARN</var></code> balls of yarn, how many scarves can she make?
+                </p>
                 <div class="solution"><var>SOLUTION</var></div>
 
                 <div class="hints">
                     <p>
-                        We can divide the balls of yarn (<var>YARN</var>) by the yarn needed per scarf (<code>\frac{<var>N</var>}{<var>D</var>}</code> of
-                        a ball) to find out how many scarves <var>person(1)</var> can make.
+                        We can divide the balls of yarn (<code><var>YARN</var></code>) by the yarn needed per scarf
+                        (<code>\frac{<var>N</var>}{<var>D</var>}</code> of a ball) to find out how many scarves <var>person(1)</var> can make.
                     </p>
                     <p><code>
                         \dfrac{\red{<var>YARN</var> \text{ <var>BALLS_OF_YARN</var>}}}
@@ -127,7 +137,7 @@
                         = \green{\text{ <var>NUMBER_OF_SCARVES</var>}}
                     </code></p>
                     <p><code>\green{\dfrac{<var>D * YARN</var>}{<var>N</var>}\text{ <var>SCARVES</var>}} = <var>SOLUTION</var>\text{ <var>SCARVES</var>}</code></p>
-                    <p><var>person(1)</var> can make <var>SOLUTION</var> scarves.</p>
+                    <p><var>person(1)</var> can make <code><var>SOLUTION</var></code> scarves.</p>
                 </div>
             </div>
 
@@ -140,32 +150,35 @@
                     <var id="PAINT">randRange(1, 3) * N</var>
                     <var id="SOLUTION">PAINT * D / N</var>
                     <var id="ROOM">randRange(1, 20) + SOLUTION</var>
-                    <var id="CANS_OF_PAINT">$._("cans of paint")</var>
-                    <var id="CAN_PER_ROOM">$._("can per room")</var>
-                    <var id="ROOMS">$._("rooms")</var>
-                    <var id="CAN_PER_ROOM">$._("can per room")</var>
-                    <var id="ROOMS_PER_CAN">$._("rooms per can")</var>
+                    <var id="CANS_OF_PAINT">i18n._("cans of paint")</var>
+                    <var id="CAN_PER_ROOM">i18n._("can per room")</var>
+                    <var id="ROOMS">i18n._("rooms")</var>
+                    <var id="CAN_PER_ROOM">i18n._("can per room")</var>
+                    <var id="ROOMS_PER_CAN">i18n._("rooms per can")</var>
                 </div>
 
                 <p class="problem" data-if="isMale(1)">
-                    <var>person(1)</var> decided to paint some of the rooms at his <var>ROOM</var>-room inn,
+                    <var>person(1)</var> decided to paint some of the rooms at his <code><var>ROOM</var></code>-room inn,
                     <var>person(1)</var>'s Place. He discovered he needed <code>\frac{<var>N</var>}{<var>D</var>}</code>
                     of a can of paint per room.
                 </p><p class="problem" data-else="">
-                    <var>person(1)</var> decided to paint some of the rooms at her <var>ROOM</var>-room inn,
+                    <var>person(1)</var> decided to paint some of the rooms at her <code><var>ROOM</var></code>-room inn,
                     <var>person(1)</var>'s Place. She discovered she needed <code>\frac{<var>N</var>}{<var>D</var>}</code>
                     of a can of paint per room.
                 </p>
 
-                <p class="question" data-if="isMale(1)">If <var>person(1)</var> had <var>PAINT</var> cans of paint, how many rooms could he paint?</p>
-                <p class="question" data-else="">If <var>person(1)</var> had <var>PAINT</var> cans of paint, how many rooms could she paint?</p>
+                <p class="question" data-if="isMale(1)">
+                    If <var>person(1)</var> had <code><var>PAINT</var></code> cans of paint, how many rooms could he paint?
+                </p><p class="question" data-else="">
+                    If <var>person(1)</var> had <code><var>PAINT</var></code> cans of paint, how many rooms could she paint?
+                </p>
 
                 <div class="solution"><var>SOLUTION</var></div>
 
                 <div class="hints">
                     <p>
-                        We can divide the cans of paint (<var>PAINT</var>) by the paint needed per room (<code>\frac{<var>N</var>}{<var>D</var>}</code> of
-                        a can) to find out how many rooms <var>person(1)</var> could paint.
+                        We can divide the cans of paint (<code><var>PAINT</var></code>) by the paint needed per room
+                        (<code>\frac{<var>N</var>}{<var>D</var>}</code> of a can) to find out how many rooms <var>person(1)</var> could paint.
                     </p>
                     <p><code>
                         \dfrac{\red{<var>PAINT</var> \text{ <var>CANS_OF_PAINT</var>}}}
@@ -182,7 +195,7 @@
                         = \blue{\text{ <var>ROOMS</var>}}
                     </code></p>
                     <p><code>\blue{\dfrac{<var>D * PAINT</var>}{<var>N</var>}\text{ <var>ROOMS</var>}} = <var>SOLUTION</var>\text{ <var>ROOMS</var>}</code></p>
-                    <p><var>person(1)</var> could paint <var>SOLUTION</var> rooms.</p>
+                    <p><var>person(1)</var> could paint <code><var>SOLUTION</var></code> rooms.</p>
                 </div>
             </div>
 
@@ -205,10 +218,10 @@
                     <var id="GCD2">getGCD(D, B)</var>
                     <var id="SIMP_B">B / GCD2</var>
                     <var id="SIMP_D">D / GCD2</var>
-                    <var id="MILE">$._("mile")</var>
-                    <var id="MILE_PER_SWIMMER">$._("mile per swimmer")</var>
-                    <var id="NUMBER_OF_SWIMMERS">$._("number of swimmers")</var>
-                    <var id="SWIMMERS_PER_MILE">$._("swimmers per mile")</var>
+                    <var id="MILE">i18n._("mile")</var>
+                    <var id="MILE_PER_SWIMMER">i18n._("mile per swimmer")</var>
+                    <var id="NUMBER_OF_SWIMMERS">i18n._("number of swimmers")</var>
+                    <var id="SWIMMERS_PER_MILE">i18n._("swimmers per mile")</var>
                 </div>
 
                 <div class="problem">
@@ -278,8 +291,8 @@
                             = \blue{<var>SOLUTION</var>}
                         </code></p>
                     </div>
-                    <p data-if="isMale(1)"><var>person(1)</var> needs <var>SOLUTION</var> swimmers on his team.</p>
-                    <p data-else=""><var>person(1)</var> needs <var>SOLUTION</var> swimmers on her team.</p>
+                    <p data-if="isMale(1)"><var>person(1)</var> needs <code><var>SOLUTION</var></code> swimmers on his team.</p>
+                    <p data-else=""><var>person(1)</var> needs <code><var>SOLUTION</var></code> swimmers on her team.</p>
                 </div>
             </div>
 
@@ -302,11 +315,11 @@
                     <var id="GCD2">getGCD(D, B)</var>
                     <var id="SIMP_B">B / GCD2</var>
                     <var id="SIMP_D">D / GCD2</var>
-                    <var id="POUND_OF_CHOCOLATE">$._("pound of chocolate")</var>
-                    <var id="POUND_PER_BAG">$._("pound per bag")</var>
-                    <var id="NUMBER_OF_BAGS">$._("number of bags")</var>
-                    <var id="POUND">$._("pound")</var>
-                    <var id="BAGS_PER_POUND">$._("bags per pound")</var>
+                    <var id="POUND_OF_CHOCOLATE">i18n._("pound of chocolate")</var>
+                    <var id="POUND_PER_BAG">i18n._("pound per bag")</var>
+                    <var id="NUMBER_OF_BAGS">i18n._("number of bags")</var>
+                    <var id="POUND">i18n._("pound")</var>
+                    <var id="BAGS_PER_POUND">i18n._("bags per pound")</var>
                 </div>
 
                 <p class="problem" data-if="isMale(1)">
@@ -380,7 +393,7 @@
                             = \blue{<var>SOLUTION</var>}
                         </code></p>
                     </div>
-                    <p><var>person(1)</var> could create <var>SOLUTION</var> gift bags.</p>
+                    <p><var>person(1)</var> could create <code><var>SOLUTION</var></code> gift bags.</p>
                 </div>
             </div>
 
@@ -403,10 +416,10 @@
                     <var id="GCD2">getGCD(D, B)</var>
                     <var id="SIMP_B">B / GCD2</var>
                     <var id="SIMP_D">D / GCD2</var>
-                    <var id="HOUR">$._("hour")</var>
-                    <var id="HOUR_PER_EXERCISE">$._("hour per exercise")</var>
-                    <var id="NUMBER_OF_EXERCISES">$._("number of exercises")</var>
-                    <var id="EXERCISES_PER_HOUR">$._("exercises per hour")</var>
+                    <var id="HOUR">i18n._("hour")</var>
+                    <var id="HOUR_PER_EXERCISE">i18n._("hour per exercise")</var>
+                    <var id="NUMBER_OF_EXERCISES">i18n._("number of exercises")</var>
+                    <var id="EXERCISES_PER_HOUR">i18n._("exercises per hour")</var>
                 </div>
 
                 <p class="problem" data-if="isMale(1)">
@@ -481,7 +494,7 @@
                             = \blue{<var>SOLUTION</var>}
                         </code></p>
                     </div>
-                    <p><var>person(1)</var> can do <var>SOLUTION</var> different types of exercise per workout.</p>
+                    <p><var>person(1)</var> can do <code><var>SOLUTION</var></code> different types of exercise per workout.</p>
                 </div>
             </div>
 

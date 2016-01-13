@@ -1,4 +1,8 @@
-(function() {
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, eqeqeq, indent, no-undef, no-unused-vars, prefer-template */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
+define(function(require) {
 
 function findChildOrAdd(elem, className) {
     var $child = $(elem).find("." + className);
@@ -82,7 +86,7 @@ $.extend(KhanUtil, {
             if (Exercises.useKatex) {
                 // Try to process the nodes with KaTeX first
                 try {
-                    katex.process(text, $katexHolder[0]);
+                    katex.render(text, $katexHolder[0]);
                     // If that worked, and we previously formatted with
                     // mathjax, do some mathjax cleanup
                     if ($elem.attr("data-math-type") === "mathjax") {
@@ -211,5 +215,4 @@ $.fn.texCleanup = function() {
     return this;
 };
 
-
-})();
+});

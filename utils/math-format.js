@@ -1,7 +1,17 @@
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, eqeqeq, indent, max-len, no-throw-literal, no-trailing-spaces, no-undef, one-var, prefer-template */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
+define(function(require) {
+
+require("./math.js");
+require("./expressions.js");
+
 $.extend(KhanUtil, {
     /* Wraps a number in paretheses if it's negative. */
-    negParens: function(n) {
-        return n < 0 ? "(" + n + ")" : n;
+    negParens: function(n, color) {
+        var n2 = color ? "\\" + color + "{" + n + "}" : n;
+        return n < 0 ? "(" + n2 + ")" : n2;
     },
 
     /* Wrapper for `fraction` which takes a decimal instead of a numerator and
@@ -143,7 +153,7 @@ $.extend(KhanUtil, {
      * If niceAngle is truthy, it also delivers more natural values for 0 (0 instead
      * of 0 \pi) and 1 (\pi instead of 1 \pi).
      * */
-    piFraction: function(num, niceAngle, tolerance) {
+    piFraction: function(num, niceAngle, tolerance, big) {
         if (num.constructor === Number) {
             if (tolerance == null) {
                 tolerance = 0.001;
@@ -161,7 +171,8 @@ $.extend(KhanUtil, {
                     return "\\pi";
                 }
             }
-            return d === 1 ? n + "\\pi" : KhanUtil.fractionSmall(n, d) + "\\pi";
+            var frac = big ? KhanUtil.fraction(n, d) : KhanUtil.fractionSmall(n, d) ;
+            return d === 1 ? n + "\\pi" : frac + "\\pi";
         }
     },
 
@@ -236,11 +247,11 @@ $.extend(KhanUtil, {
     // just return the number itself as a string.  This is superior to
     // cardinal() in that it can be translated easily.
     cardinalThrough20: function(n) {
-        var cardinalUnits = [$._("zero"), $._("one"), $._("two"), $._("three"),
-            $._("four"), $._("five"), $._("six"), $._("seven"), $._("eight"),
-            $._("nine"), $._("ten"), $._("eleven"), $._("twelve"),
-            $._("thirteen"), $._("fourteen"), $._("fifteen"), $._("sixteen"),
-            $._("seventeen"), $._("eighteen"), $._("nineteen"), $._("twenty")];
+        var cardinalUnits = [i18n._("zero"), i18n._("one"), i18n._("two"), i18n._("three"),
+            i18n._("four"), i18n._("five"), i18n._("six"), i18n._("seven"), i18n._("eight"),
+            i18n._("nine"), i18n._("ten"), i18n._("eleven"), i18n._("twelve"),
+            i18n._("thirteen"), i18n._("fourteen"), i18n._("fifteen"), i18n._("sixteen"),
+            i18n._("seventeen"), i18n._("eighteen"), i18n._("nineteen"), i18n._("twenty")];
         if (n >= 0 && n <= 20) {
             return cardinalUnits[n];
         }
@@ -255,13 +266,13 @@ $.extend(KhanUtil, {
     },
 
     ordinalThrough20: function(n) {
-        var ordinalUnits = [$._("zeroth"), $._("first"), $._("second"),
-            $._("third"), $._("fourth"), $._("fifth"), $._("sixth"),
-            $._("seventh"), $._("eighth"), $._("ninth"), $._("tenth"),
-            $._("eleventh"), $._("twelfth"), $._("thirteenth"),
-            $._("fourteenth"), $._("fifteenth"), $._("sixteenth"),
-            $._("seventeenth"), $._("eighteenth"), $._("nineteenth"),
-            $._("twentieth")];
+        var ordinalUnits = [i18n._("zeroth"), i18n._("first"), i18n._("second"),
+            i18n._("third"), i18n._("fourth"), i18n._("fifth"), i18n._("sixth"),
+            i18n._("seventh"), i18n._("eighth"), i18n._("ninth"), i18n._("tenth"),
+            i18n._("eleventh"), i18n._("twelfth"), i18n._("thirteenth"),
+            i18n._("fourteenth"), i18n._("fifteenth"), i18n._("sixteenth"),
+            i18n._("seventeenth"), i18n._("eighteenth"), i18n._("nineteenth"),
+            i18n._("twentieth")];
         if (n >= 0 && n <= 20) {
             return ordinalUnits[n];
         }
@@ -274,22 +285,22 @@ $.extend(KhanUtil, {
     // TODO(csilvers): I18N: this doesn't work at all outside English.
     // cf. https://github.com/kslazarev/numbers_and_words (Ruby, sadly).
     cardinal: function(n) {
-        var cardinalScales = ["", $._("thousand"), $._("million"),
-            $._("billion"), $._("trillion"), $._("quadrillion"),
-            $._("quintillion"), $._("sextillion"), $._("septillion"),
-            $._("octillion"), $._("nonillion"), $._("decillion"),
-            $._("undecillion"), $._("duodecillion"), $._("tredecillion"),
-            $._("quattuordecillion"), $._("quindecillion"),
-            $._("sexdecillion"), $._("septendecillion"), $._("octodecillion"),
-            $._("novemdecillion"), $._("vigintillion")];
-        var cardinalUnits = [$._("zero"), $._("one"), $._("two"), $._("three"),
-            $._("four"), $._("five"), $._("six"), $._("seven"), $._("eight"),
-            $._("nine"), $._("ten"), $._("eleven"), $._("twelve"),
-            $._("thirteen"), $._("fourteen"), $._("fifteen"), $._("sixteen"),
-            $._("seventeen"), $._("eighteen"), $._("nineteen")];
-        var cardinalTens = ["", "", $._("twenty"), $._("thirty"), $._("forty"),
-            $._("fifty"), $._("sixty"), $._("seventy"), $._("eighty"),
-            $._("ninety")];
+        var cardinalScales = ["", i18n._("thousand"), i18n._("million"),
+            i18n._("billion"), i18n._("trillion"), i18n._("quadrillion"),
+            i18n._("quintillion"), i18n._("sextillion"), i18n._("septillion"),
+            i18n._("octillion"), i18n._("nonillion"), i18n._("decillion"),
+            i18n._("undecillion"), i18n._("duodecillion"), i18n._("tredecillion"),
+            i18n._("quattuordecillion"), i18n._("quindecillion"),
+            i18n._("sexdecillion"), i18n._("septendecillion"), i18n._("octodecillion"),
+            i18n._("novemdecillion"), i18n._("vigintillion")];
+        var cardinalUnits = [i18n._("zero"), i18n._("one"), i18n._("two"), i18n._("three"),
+            i18n._("four"), i18n._("five"), i18n._("six"), i18n._("seven"), i18n._("eight"),
+            i18n._("nine"), i18n._("ten"), i18n._("eleven"), i18n._("twelve"),
+            i18n._("thirteen"), i18n._("fourteen"), i18n._("fifteen"), i18n._("sixteen"),
+            i18n._("seventeen"), i18n._("eighteen"), i18n._("nineteen")];
+        var cardinalTens = ["", "", i18n._("twenty"), i18n._("thirty"), i18n._("forty"),
+            i18n._("fifty"), i18n._("sixty"), i18n._("seventy"), i18n._("eighty"),
+            i18n._("ninety")];
         // For formatting numbers less than 1000
         var smallNumberWords = function(n) {
             var hundredDigit = Math.floor(n / 100);
@@ -297,7 +308,7 @@ $.extend(KhanUtil, {
             var str = "";
 
             if (hundredDigit) {
-                str += $._("%(unit)s hundred",
+                str += i18n._("%(unit)s hundred",
                     {unit: cardinalUnits[hundredDigit]});
             }
 
@@ -330,7 +341,7 @@ $.extend(KhanUtil, {
         };
 
         if (n === 0) {
-            return $._("zero");
+            return i18n._("zero");
         } else {
             var neg = false;
             if (n < 0) {
@@ -356,7 +367,7 @@ $.extend(KhanUtil, {
             }
 
             if (neg) {
-                words.unshift($._("negative"));
+                words.unshift(i18n._("negative"));
             }
 
             return words.join(" ");
@@ -379,15 +390,13 @@ $.extend(KhanUtil, {
         if ((b * b - 4 * a * c) === 0) {
             // 0 under the radical
             rootString += KhanUtil.fraction(-b, 2 * a, true, true, true);
-        } else if (underRadical[0] === 1) {
-            // The number under the radical cannot be simplified
-            rootString += KhanUtil.expr(["frac", ["+-", -b, ["sqrt", underRadical[1]]],
-                                                 2 * a]);
         } else if (underRadical[1] === 1) {
             // The absolute value of the number under the radical is a perfect square
-
             rootString += KhanUtil.fraction(-b + underRadical[0], 2 * a, true, true, true) + "," +
                 KhanUtil.fraction(-b - underRadical[0], 2 * a, true, true, true);
+        } else if (underRadical[0] === 1) {
+            // The number under the radical cannot be simplified
+            rootString += KhanUtil.expr(["frac", ["+-", -b, ["sqrt", underRadical[1]]], 2 * a]);
         } else {
             // under the radical can be partially simplified
             var divisor = KhanUtil.getGCD(b, 2 * a, underRadical[0]);
@@ -452,16 +461,15 @@ $.extend(KhanUtil, {
     },
 
     _plusTrim: function(s) {
-
+        
         if (typeof s === "string" && isNaN(s)) {
 
             // extract color, so we can handle stripping the 1 out of \color{blue}{1xy}
             if (s.indexOf("{") !== -1) {
 
                 // we're expecting something like "\color{blue}{-1}..."
-                var l, r;
-                l = s.indexOf("{", s.indexOf("{") + 1) + 1;
-                r = s.indexOf("}", s.indexOf("}") + 1);
+                var l = s.indexOf("{", s.indexOf("{") + 1) + 1;
+                var r = s.indexOf("}", s.indexOf("}") + 1);
 
                 // if we've encountered \color{blue}{1}\color{xy} somehow
                 if (l !== s.lastIndexOf("{") + 1 && +KhanUtil._plusTrim(s.slice(l, r)) === 1) {
@@ -533,11 +541,11 @@ $.extend(KhanUtil, {
                 equation = radius;
             } else {
                 var angleRep = KhanUtil.piFraction(angle, true);
-                var cis = "\\cos(" + angleRep + ") + i \\sin(" + angleRep + ")";
+                var cis = "\\cos \\left(" + angleRep + "\\right) + i \\sin \\left(" + angleRep + "\\right)";
 
                 // Special case to circumvent ugly "*1* (sin(...) + i cos(...))"
                 if (radius !== 1) {
-                    equation = KhanUtil.expr(["*", radius, cis]);
+                    equation = radius + "\\left(" + cis + "\\right)";
                 } else {
                     equation = cis;
                 }
@@ -546,11 +554,54 @@ $.extend(KhanUtil, {
         return equation;
     },
 
+    coefficient: function(n) {
+        if (n === 1 || n === "1") {
+            return "";
+        } else if (n === -1 || n === "-1") {
+            return "-";
+        } else {
+            return n;
+        }
+    },
+
+    fractionVariable: function(numerator, denominator, variable) {
+        variable = variable || "";
+        
+        if (denominator === 0) {
+            return "\\text{undefined}";
+        }
+
+        if (numerator === 0) {
+            return 0;
+        }
+
+        if (typeof denominator === "number") {
+            if (denominator < 0) {
+                numerator *= -1;
+                denominator *= -1;
+            }
+
+            var GCD = KhanUtil.getGCD(numerator, denominator);
+            numerator /= GCD;
+            denominator /= GCD;
+
+            if (denominator === 1) {
+                return KhanUtil.coefficient(numerator) + variable;
+            }
+        }
+
+        if (numerator < 0) {
+            return "-\\dfrac{" + KhanUtil.coefficient(-numerator) + variable + "}{" + denominator + "}";
+        } else {
+            return "\\dfrac{" + KhanUtil.coefficient(numerator) + variable + "}{" + denominator + "}";
+        }
+    },
+
     complexNumber: function(real, imaginary) {
         if (real === 0 && imaginary === 0) {
             return "0";
         } else if (real === 0) {
-            return (imaginary === 1 ? "" : imaginary === -1 ? "-" : imaginary) + "i";
+            return (KhanUtil.coefficient(imaginary)) + "i";
         } else if (imaginary === 0) {
             return real;
         } else {
@@ -596,7 +647,9 @@ $.extend(KhanUtil, {
 
     scientific: function(precision, num) {
         var exponent = KhanUtil.scientificExponent(num);
-        var mantissa = KhanUtil.localeToFixed(KhanUtil.scientificMantissa(precision, num), precision);
+        var mantissa = KhanUtil.localeToFixed(KhanUtil.scientificMantissa(precision, num), precision - 1);
         return "" + mantissa + "\\times 10^{" + exponent + "}";
     }
+});
+
 });

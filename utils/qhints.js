@@ -1,3 +1,9 @@
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable indent, no-unused-vars, no-undef */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
+define(function(require) {
+
 $.fn["qhintsLoad"] = function() {
 
     var checkAnswer = function(parent, source) {
@@ -31,10 +37,10 @@ $.fn["qhintsLoad"] = function() {
         if (!source) {
             feedback.text(answer);
         } else if (userInput === answer) {
-            feedback.text($._("Correct! The answer is %(answer)s.",
+            feedback.text(i18n._("Correct! The answer is %(answer)s.",
                 {answer: answer})).addClass("correct");
         } else {
-            feedback.text($._("Incorrect. The answer is %(answer)s.",
+            feedback.text(i18n._("Incorrect. The answer is %(answer)s.",
                 {answer: answer})).addClass("incorrect");
         }
 
@@ -65,3 +71,5 @@ $.fn["qhintsLoad"] = function() {
         }
     });
 };
+
+});

@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <title>Inequalities on a number line</title>
-    <script src="../khan-exercise.js"></script>
+    <script data-main="../local-only/main.js" src="../local-only/require.js"></script>
     <script>
         function numberLineWithArrow( start, end, step, x, y, arrowStartX, arrowEndX, inclusive ) {
 
@@ -86,7 +86,7 @@
 
             // Label number line choice if necessary
             if ( label ) {
-                graph.label( [start - 0.2, 0], "\\text{" + $.i18nDoNotTranslate("%(label)s:", {label: label}) + "}", "left" );
+                graph.label( [start - 0.2, 0], "\\text{" + i18n.i18nDoNotTranslate("%(label)s:", {label: label}) + "}", "left" );
             }
 
             var arrowStartX = ( i + frac ) * multiplier;

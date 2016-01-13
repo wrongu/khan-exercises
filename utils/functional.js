@@ -1,3 +1,9 @@
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, indent, max-len, no-unused-vars */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
+define(function(require) {
+
 $.extend(KhanUtil, {
     tabulate: function(fn, n) {
         // Return an array, [fn(), fn(), ...] of length n if fn does not take arguments
@@ -6,4 +12,6 @@ $.extend(KhanUtil, {
             return [fn(i)];
         });
     }
+});
+
 });

@@ -3,14 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <title>Congruency postulates</title>
-    <script src="../khan-exercise.js"></script>
-    <style>
-        div#triangles {
-            outline-color: #999;
-            outline-style: dashed;
-            outline-width: 1px;
-        }
-    </style>
+    <script data-main="../local-only/main.js" src="../local-only/require.js"></script>
 </head>
 <body>
     <div class="exercise">
@@ -29,12 +22,12 @@
                         ( ( TYPE !== 'SSA' ) || ( (TRIANGLE.niceSideLengths[0] + 1) &lt; TRIANGLE.niceSideLengths[1] &amp;&amp; abs(ANGLES[0] - 90) &gt; 10 ) )">
                     <var id="TYPE">randFromArray([ "SSS", "SAS", "SAA", "ASA", "SSA", "SSA", "AAA" ])</var>
                     <var id="NAME">{
-                            "SSS": $._("Side-Side-Side"),
-                            "SAS": $._("Side-Angle-Side"),
-                            "SAA": $._("Side-Angle-Angle"),
-                            "ASA": $._("Angle-Side-Angle"),
-                            "SSA": $._("Side-Side-Angle"),
-                            "AAA": $._("Angle-Angle-Angle")
+                            "SSS": i18n._("Side-Side-Side"),
+                            "SAS": i18n._("Side-Angle-Side"),
+                            "SAA": i18n._("Side-Angle-Angle"),
+                            "ASA": i18n._("Angle-Side-Angle"),
+                            "SSA": i18n._("Side-Side-Angle"),
+                            "AAA": i18n._("Angle-Angle-Angle")
                         }[ TYPE ]
                     </var>
                     <var id="ANGLES">randomTriangleAngles.triangle()</var>
@@ -47,10 +40,12 @@
                 <p class="problem">
                     <strong>Is <em><var>NAME</var></em> a triangle congruency
                         postulate?</strong><br>
+                </p>
+                <p class="render-answer-area-here"></p>
+                <p>
                     Answer the question by clicking and dragging the points
                     below to see how many different triangles you can
-                    construct.<br>
-                    If you can only construct congruent triangles, then the
+                    construct. If you can only construct congruent triangles, then the
                     <var>NAME</var> postulate is true. The <var>NAME</var>
                     postulate is not true if you can construct two or more
                     different triangles using the given information.
@@ -58,7 +53,7 @@
                 <div class="question">
                     <em>Your triangle can be anywhere. There is no need to line
                         up the two triangles.</em>
-                    <div class="graphie" id="triangles">
+                    <div class="graphie" id="congruent-triangles">
                         init({
                             range: [ [ -6.2, 6.2 ], [ -5.9, 6.5 ] ]
                         });
@@ -116,9 +111,9 @@
                         } else if ( guess[0] !== ANSWER ) {
                             return false;
                         } else if ( !isTriangle ) {
-                            return $._("Your answer is almost correct, but you havent constructed a triangle.");
+                            return i18n._("Your answer is almost correct, but you haven't constructed a triangle.");
                         } else if ( ANSWER === "No" &amp;&amp; isCongruent ) {
-                            return $._("Your answer is almost correct, but the two triangles are congruent. Prove your answer by trying to construct an incongruent triangle.");
+                            return i18n._("Your answer is almost correct, but the two triangles are congruent. Prove your answer by trying to construct an incongruent triangle.");
                         } else {
                             return true;
                         }
@@ -163,7 +158,7 @@
                             style({ stroke: "#b1c9f5", "stroke-width": 5 });
                             path( [ kline.midpoint( triangle.sides[ 2 ] ), triangle.points[2], triangle.points[1], triangle.points[0], kline.midpoint( triangle.sides[ 2 ] ) ] );
                             addTriangleDecorations( triangle, TYPE );
-                            KhanUtil.currentGraph = $( "div#triangles" ).data().graphie
+                            KhanUtil.currentGraph = $( "div#congruent-triangles" ).data().graphie
                         </div>
                         <div class="graphie">
                             var points = [
@@ -180,7 +175,7 @@
                             style({ stroke: "#b1c9f5", "stroke-width": 5 });
                             path( [ kline.midpoint( triangle.sides[ 2 ] ), triangle.points[2], triangle.points[1], triangle.points[0], kline.midpoint( triangle.sides[ 2 ] ) ] );
                             addTriangleDecorations( triangle, TYPE );
-                            KhanUtil.currentGraph = $( "div#triangles" ).data().graphie
+                            KhanUtil.currentGraph = $( "div#congruent-triangles" ).data().graphie
                         </div>
                     </div>
                     <p data-if="TYPE === 'SSA'">
@@ -200,7 +195,7 @@
                             style({ stroke: "#b1c9f5", "stroke-width": 5 });
                             path( [ kline.midpoint( TRIANGLE.sides[ 2 ] ), TRIANGLE.points[2], TRIANGLE.points[1], TRIANGLE.points[0], kline.midpoint( TRIANGLE.sides[ 2 ] ) ] );
                             addTriangleDecorations( TRIANGLE, TYPE );
-                            KhanUtil.currentGraph = $( "div#triangles" ).data().graphie
+                            KhanUtil.currentGraph = $( "div#congruent-triangles" ).data().graphie
                         </div>
                         <div class="graphie" style="float: left">
                             var triangle = new Triangle( [ 0, 0 ], ANGLES, SCALE - 4, {} );
@@ -211,7 +206,7 @@
                             style({ stroke: "#b1c9f5", "stroke-width": 5 });
                             path( [ kline.midpoint( triangle.sides[ 2 ] ), triangle.points[2], triangle.points[1], triangle.points[0], kline.midpoint( triangle.sides[ 2 ] ) ] );
                             addTriangleDecorations( triangle, TYPE );
-                            KhanUtil.currentGraph = $( "div#triangles" ).data().graphie
+                            KhanUtil.currentGraph = $( "div#congruent-triangles" ).data().graphie
                         </div>
                     </div>
                     <p data-if="TYPE === 'AAA'" style="clear: left">

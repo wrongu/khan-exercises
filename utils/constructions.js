@@ -1,9 +1,10 @@
-(function(KhanUtil) {
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable brace-style, comma-dangle, eqeqeq, indent, max-len, no-redeclare, no-undef, no-unused-vars, prefer-template, space-before-function-paren */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
 
-var kmatrix = KhanUtil.kmatrix;
-$.fn["constructionsLoad"] = function() {
-    kmatrix = KhanUtil.kmatrix;
-};
+define(function(require) {
+
+var kmatrix = require("./kmatrix.js");
 
 $.extend(KhanUtil, {
     drawHintLine: function(pt1, pt2, ticks) {
@@ -132,7 +133,7 @@ $.extend(KhanUtil, {
 
             var t = construction.tool;
 
-            $(t.center.mouseTarget[0]).bind(
+            $(t.center.mouseTarget.getMouseTarget()).bind(
                 "vmouseover vmouseout", function(event) {
                     if (t.center.highlight) {
                         t.circ.animate({
@@ -152,8 +153,6 @@ $.extend(KhanUtil, {
 
             // add new points that all other points should snap to
             construction.snapPoints.push(t.center);
-
-
 
             t.center.onMove = function(x, y) {
                 t.circ.toFront();
@@ -219,9 +218,10 @@ $.extend(KhanUtil, {
                 }
             };
 
-            t.center.mouseTarget.dblclick(function() {
-                construction.removeTool(t, true);
-            });
+            // XXX(joel/emily)
+            // t.center.mouseTarget.dblclick(function() {
+            //     construction.removeTool(t, true);
+            // });
 
             $(t.perim[0]).css("cursor", "move");
             $(t.perim[0]).bind(
@@ -346,7 +346,7 @@ $.extend(KhanUtil, {
                     movePointsWithLine: true
                 });
 
-            $(construction.tool.center.mouseTarget[0]).bind(
+            $(construction.tool.center.mouseTarget.getMouseTarget()).bind(
                 "vmouseover vmouseout", construction.tool, function(event) {
                     if (event.data.center.highlight) {
                         event.data.line1.visibleLine.animate({
@@ -383,8 +383,8 @@ $.extend(KhanUtil, {
                 //t.first.onMoveEnd(t.first.coord[0], t.first.coord[1]);
                 //t.second.onMoveEnd(t.second.coord[0], t.second.coord[1]);
             };
-            
-            $(t.center.mouseTarget[0]).bind("dblclick", function() {
+
+            $(t.center.mouseTarget.getMouseTarget()).bind("dblclick", function() {
                 construction.removeTool(t, true);
             });
 
@@ -395,8 +395,13 @@ $.extend(KhanUtil, {
         // the straightedge object has the following fields
         // first, second: movable endpoints
         // edge: movable line segment
-        construction.addStraightedge = function(extend) {
+        // extend determines whether the line extends off
+        // screen (default) or is a line segment
+        // if fixed is true then the line cannot be dragged
+        // by selecting the line (as opposed to the end points)
+        construction.addStraightedge = function(extend, fixed) {
             extend = extend == null ? true : extend;
+            fixed = fixed == null ? false : fixed;
 
             construction.tool = {
                 interType: "line",
@@ -435,10 +440,13 @@ $.extend(KhanUtil, {
                         "stroke-width": 3
                     },
                     extendLine: extend,
+                    constraints: {
+                        fixed: fixed
+                    },
                     movePointsWithLine: true
                 });
 
-            $(construction.tool.first.mouseTarget[0]).bind(
+            $(construction.tool.first.mouseTarget.getMouseTarget()).bind(
                 "vmouseover vmouseout", construction.tool, function(event) {
                     if (event.data.first.highlight) {
                         event.data.edge.visibleLine.animate({
@@ -458,7 +466,7 @@ $.extend(KhanUtil, {
                         }, 50);
                     }
                 });
-            $(construction.tool.second.mouseTarget[0]).bind(
+            $(construction.tool.second.mouseTarget.getMouseTarget()).bind(
                 "vmouseover vmouseout", construction.tool, function(event) {
                     if (event.data.second.highlight) {
                         event.data.edge.visibleLine.animate({
@@ -478,7 +486,7 @@ $.extend(KhanUtil, {
                         }, 50);
                     }
                 });
-            $(construction.tool.edge.mouseTarget[0]).bind(
+            $(construction.tool.edge.mouseTarget.getMouseTarget()).bind(
                 "vmouseover vmouseout", construction.tool, function(event) {
                     if (event.data.edge.highlight) {
                         event.data.first.visibleShape.animate({
@@ -586,15 +594,15 @@ $.extend(KhanUtil, {
                 endpointMoveEnd(x, y, t.second);
             };
 
-            $(t.first.mouseTarget[0]).bind("dblclick", function() {
+            $(t.first.mouseTarget.getMouseTarget()).bind("dblclick", function() {
                 construction.removeTool(t, true);
             });
 
-            $(t.second.mouseTarget[0]).bind("dblclick", function() {
+            $(t.second.mouseTarget.getMouseTarget()).bind("dblclick", function() {
                 construction.removeTool(t, true);
             });
 
-            $(t.edge.mouseTarget[0]).bind("dblclick", function() {
+            $(t.edge.mouseTarget.getMouseTarget()).bind("dblclick", function() {
                 construction.removeTool(t, true);
             });
             construction.updateIntersections();
@@ -607,7 +615,7 @@ $.extend(KhanUtil, {
                         key === "first" || key === "second") {
                     tool[key].visibleShape.remove();
                     tool[key].visible = false;
-                    $(tool[key].mouseTarget[0]).remove();
+                    $(tool[key].mouseTarget.getMouseTarget()).remove();
                 } else if (key === "circ") {
                     tool[key].remove();
                 } else if (key === "edge") {
@@ -633,9 +641,15 @@ $.extend(KhanUtil, {
             });
 
             construction.tools = staticTools;
-            construction.snapPoints = [];
+            construction.snapPoints =
+                construction.snapPoints.filter(function(point) {
+                    return point.dummy;
+                });
             construction.interPoints = [];
-            construction.snapLines = [];
+            construction.snapLines =
+                construction.snapLines.filter(function(line) {
+                    return line.dummy;
+                });
         };
 
         // detect intersections between existing circles,
@@ -694,6 +708,7 @@ $.extend(KhanUtil, {
                                 construction.interPoints.push([x2, y2]);
                             }
                         }
+						// two circles
                         else if (tool1.center != null && tool2.center != null) {
                             var a = tool1.center.coord[0];
                             var b = tool1.center.coord[1];
@@ -750,6 +765,7 @@ $.extend(KhanUtil, {
                 fixed: true
             })
         };
+        construction.tool.edge.dummy = true;
         // not sure about execution order here (vis-a-vis addConstruction),
         // so be careful
         if (construction.tools == null) {
@@ -768,7 +784,7 @@ $.extend(KhanUtil, {
     // add non-interactive circle
     addDummyCircle: function(center, radius) {
         var construction = KhanUtil.construction;
-        var dummy = {coord: center};
+        var dummy = {coord: center, dummy:true};
 
         KhanUtil.currentGraph.circle(center, {
             r: radius,
@@ -788,7 +804,7 @@ $.extend(KhanUtil, {
     // add non-interactive point (can't just use circle or snapping
     // won't work)
     addDummyPoint: function(coordinates) {
-        var dummy = {coord: coordinates};
+        var dummy = {coord: coordinates, dummy:true};
         KhanUtil.currentGraph.circle(coordinates,
                                 {r: 0.08, fill: "black", stroke: "none"});
 
@@ -807,7 +823,7 @@ $.extend(KhanUtil, {
         construction.tool = {interType: "line", dummy: true,
                       first: {coord: end},
                       second: {coord: other},
-                      edge: {coordA: end, coordZ: other}};
+                      edge: {coordA: end, coordZ: other, dummy:true}};
 
         KhanUtil.currentGraph.line(end, other,
             {stroke: "black", "stroke-width": 2, arrows: "->"});
@@ -912,6 +928,19 @@ $.extend(KhanUtil, {
 
     },
 
+    // Find whether a line has a given angle
+    // to a certain precision (in degrees)
+    angleEqual: function(line, angle, precision) {
+        var ang = Math.atan2(line.second.coord[1] - line.first.coord[1],
+                             line.second.coord[0] - line.first.coord[0]);
+
+        ang *= 180 / Math.PI;
+        if (ang < 0) {
+            ang += 180;
+        }
+        return Math.abs(angle - ang) < precision;
+    },
+
     // Given an array of construction tools, return an array
     // with either coordinates of a line and the center and
     // radius of a circle.
@@ -950,33 +979,42 @@ $.extend(KhanUtil, {
     },
 
     findCompass: function (guess, properties) {
-        var radiusFunction = function (r) { return true; };
-        var xFunction = function (cx) { return true; };
-        var yFunction = function (cy) { return true; };
+        var testFunctions = [];
 
         if (properties.radius != null) {
-            radiusFunction = function (r) {
-                return Math.abs(r - properties.radius) < 0.5;
-            };
+            testFunctions.push(function (tool) {
+                return Math.abs(tool.radius - properties.radius) < 0.5;
+            });
         }
 
         if (properties.cx != null) {
-            xFunction = function (p) {
-                return Math.abs(p[0] - properties.cx) < 0.5;
-            };
+            testFunctions.push(function (tool) {
+                return Math.abs(tool.center.coord[0] - properties.cx) < 0.5;
+            });
         }
 
         if (properties.cy != null) {
-            yFunction = function (p) {
-                return Math.abs(p[1] - properties.cy) < 0.5;
-            };
+            testFunctions.push(function (tool) {
+                return Math.abs(tool.center.coord[1] - properties.cy) < 0.5;
+            });
+        }
+
+        if (properties.center != null) {
+            testFunctions.push(function (tool) {
+                return Math.abs(tool.center.coord[0] - properties.center[0]) < 0.5 &&
+                    Math.abs(tool.center.coord[1] - properties.center[1]) < 0.5;
+            });
         }
 
         return _.filter(guess, function(tool) {
-            return tool.center != null &&
-                    radiusFunction(tool.radius) &&
-                    xFunction(tool.center.coord) &&
-                    yFunction(tool.center.coord);
+            if (tool.center != null) {
+                for (var i = 0; i < testFunctions.length; i++) {
+                    if (!testFunctions[i](tool)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
         });
     },
 
@@ -1004,8 +1042,8 @@ $.extend(KhanUtil, {
         // Find angles to line points
         var angles = [];
         _.map(lines, function(tool) {
-            var angle1 = Math.atan2(tool.first.coord[1], tool.first.coord[0]) * 180 / Math.PI; 
-            var angle2 = Math.atan2(tool.second.coord[1], tool.second.coord[0]) * 180 / Math.PI; 
+            var angle1 = Math.atan2(tool.first.coord[1], tool.first.coord[0]) * 180 / Math.PI;
+            var angle2 = Math.atan2(tool.second.coord[1], tool.second.coord[0]) * 180 / Math.PI;
             angles.push((angle1 - offsetAngle + 540 + 180 / n) % 360);
             angles.push((angle2 - offsetAngle + 540 + 180 / n) % 360);
         });
@@ -1043,4 +1081,5 @@ $.extend(KhanUtil, {
         return lines;
     }
 });
-})(KhanUtil);
+
+});

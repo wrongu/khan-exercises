@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <title>Comparing improper fractions and mixed numbers</title>
-    <script src="../khan-exercise.js"></script>
+    <script data-main="../local-only/main.js" src="../local-only/require.js"></script>
 </head>
 <body>
 
@@ -28,12 +28,12 @@
                 var n2 = I_NUM / I_DENOM;
 
                 if (n1 - n2 &gt; 1e-9) {
-                    return ["&gt;", $._("is more than")];
+                    return ["&gt;", i18n._("is more than")];
                 } else if (abs(n1 - n2) &lt; 1e-9) {
-                    return ["=", $._("is equal to")];
+                    return ["=", i18n._("is equal to")];
                 }
                 else {
-                    return ["&lt;", $._("is less than")];
+                    return ["&lt;", i18n._("is less than")];
                 }
             })()
             </var>
@@ -42,7 +42,7 @@
         <div class="problems">
             <div id="same-whole">
                 <div class="problem">
-                    <p>Fill in the blank.</p>
+                    <p>Fill in the blank to compare the mixed number and the fraction.</p>
                     <p>
                         <code><var>WHOLE2</var>\dfrac{<var>M_NUM</var>}{<var>M_DENOM</var>}</code>
                         ____<code>\space \dfrac{<var>I_NUM</var>}{<var>I_DENOM</var>}</code>

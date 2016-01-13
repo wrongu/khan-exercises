@@ -1,15 +1,18 @@
-(function() {
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, eqeqeq, indent, max-len, no-redeclare, no-undef, no-unused-vars, one-var, prefer-spread, prefer-template, space-infix-ops, space-unary-ops */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
 
-var knumber = KhanUtil.knumber;
-var kvector = KhanUtil.kvector;
-var kpoint = KhanUtil.kpoint;
-var kline = KhanUtil.kline;
-$.fn["interactiveLoad"] = function() {
-    knumber = KhanUtil.knumber;
-    kvector = KhanUtil.kvector;
-    kpoint = KhanUtil.kpoint;
-    kline = KhanUtil.kline;
-};
+define(function(require) {
+
+require("../third_party/jquery.mobile.vmouse.js");
+
+require("./graphie.js");
+var kvector = require("./kvector.js");
+var kpoint = require("./kpoint.js");
+var kline = require("./kline.js");
+var WrappedEllipse = require("./wrapped-ellipse.js");
+var WrappedLine = require("./wrapped-line.js");
+var WrappedPath = require("./wrapped-path.js");
 
 function sum(array) {
     return _.reduce(array, function(memo, arg) { return memo + arg; }, 0);
@@ -98,7 +101,7 @@ $.extend(KhanUtil, {
                             top: offset.top
                         });
 
-                        $(document).bind("vmousemove vmouseup", function(event) {
+                        $(document).bind("vmousemove.tile vmouseup.tile", function(event) {
                             event.preventDefault();
                             if (event.type === "vmousemove") {
                                 sorter.hasAttempted = true;
@@ -133,7 +136,7 @@ $.extend(KhanUtil, {
                                     }
                                 }
                             } else if (event.type === "vmouseup") {
-                                $(document).unbind("vmousemove vmouseup");
+                                $(document).unbind(".tile");
                                 var position = $(tile).offset();
                                 $(position).animate(placeholder.offset(), {
                                     duration: 150,
@@ -229,23 +232,92 @@ $.extend(KhanUtil.Graphie.prototype, {
     // handlers wherever we want.
     addMouseLayer: function(options) {
         var graph = this;
-        options = _.extend({}, options);
+        options = _.extend({
+            allowScratchpad: false
+        }, options);
 
+        var mouselayerZIndex = 2;
         graph.mouselayer = Raphael(graph.raphael.canvas.parentNode, graph.xpixels, graph.ypixels);
-        $(graph.mouselayer.canvas).css("z-index", 1);
-        if (options.onClick) {
+        $(graph.mouselayer.canvas).css("z-index", mouselayerZIndex);
+        if (options.onClick || options.onMouseDown || options.onMouseMove ||
+                options.onMouseOver || options.onMouseOut) {
             var canvasClickTarget = graph.mouselayer.rect(
                     0, 0, graph.xpixels, graph.ypixels).attr({
                 fill: "#000",
                 opacity: 0
             });
-            $(graph.mouselayer.canvas).on("vmouseup", function(e) {
+            var isClickingCanvas = false;
+
+            $(graph.mouselayer.canvas).on("vmousedown", function(e) {
                 if (e.target === canvasClickTarget[0]) {
-                    options.onClick(graph.getMouseCoord(e));
+                    if (options.onMouseDown) {
+                        options.onMouseDown(graph.getMouseCoord(e));
+                    }
+                    isClickingCanvas = true;
+
+                    if (options.onMouseMove) {
+                        $(document).bind("vmousemove.mouseLayer", function(e) {
+                            if (isClickingCanvas) {
+                                e.preventDefault();
+                                options.onMouseMove(graph.getMouseCoord(e));
+                            }
+                        });
+                    }
+
+                    $(document).bind("vmouseup.mouseLayer", function(e) {
+                        $(document).unbind(".mouseLayer");
+
+                        // Only register clicks that started on the canvas, and not
+                        // on another mouseLayer target
+                        if (isClickingCanvas && options.onClick) {
+                            options.onClick(graph.getMouseCoord(e));
+                        }
+                        isClickingCanvas = false;
+                    });
                 }
             });
+            if (options.onMouseOver) {
+                $(graph.mouselayer.canvas).on("vmouseover", function(e) {
+                    options.onMouseOver(graph.getMouseCoord(e));
+                });
+            }
+            if (options.onMouseOut) {
+                $(graph.mouselayer.canvas).on("vmouseout", function(e) {
+                    options.onMouseOut(graph.getMouseCoord(e));
+                });
+            }
         }
-        Khan.scratchpad.disable();
+        if (!options.allowScratchpad) {
+            Khan.scratchpad.disable();
+        }
+
+        // Add mouse and visible wrapper layers for DOM-node-wrapped movables
+        graph._mouselayerWrapper = document.createElement("div");
+        $(graph._mouselayerWrapper).css({
+            position: "absolute",
+            left: 0,
+            top: 0,
+            zIndex: mouselayerZIndex
+        });
+
+        graph._visiblelayerWrapper = document.createElement("div");
+        $(graph._visiblelayerWrapper).css({
+            position: "absolute",
+            left: 0,
+            top: 0
+        });
+
+        var el = graph.raphael.canvas.parentNode;
+        el.appendChild(graph._visiblelayerWrapper);
+        el.appendChild(graph._mouselayerWrapper);
+
+        // Add functions for adding to wrappers
+        graph.addToMouseLayerWrapper = function(el) {
+            this._mouselayerWrapper.appendChild(el);
+        };
+        graph.addToVisibleLayerWrapper = function(el) {
+            this._visiblelayerWrapper.appendChild(el);
+        };
     },
 
     /**
@@ -306,12 +378,15 @@ $.extend(KhanUtil.Graphie.prototype, {
             vertex: [0, 0],
             point3: [0, 0],
             label: null,
-            text: "",
             numArcs: 1,
+            showRightAngleMarker: true,
             pushOut: 0,
             clockwise: false,
             style: {}
         });
+
+        // Allow null text to hide the 90 degree angle marker
+        var text = (options.text === undefined) ? "" : options.text;
 
         var vertex = options.vertex;
         var sVertex = graphie.scalePoint(vertex);
@@ -340,7 +415,7 @@ $.extend(KhanUtil.Graphie.prototype, {
 
         var temp = [];
 
-        if (Math.abs(angle - 90) < 1e-9) {
+        if (Math.abs(angle - 90) < 1e-9 && options.showRightAngleMarker) {
             // Draw right angle box
             var v1 = addPoints(sVertex, scaledPolarDeg(sRadius, startAngle));
             var v2 = addPoints(sVertex, scaledPolarDeg(sRadius, endAngle));
@@ -365,7 +440,6 @@ $.extend(KhanUtil.Graphie.prototype, {
             });
         }
 
-        var text = options.text;
         if (text) {
             // Update label text
 
@@ -672,19 +746,25 @@ $.extend(KhanUtil.Graphie.prototype, {
             lineStarts: [],
             lineEnds: [],
             polygonVertices: [],
-            normalStyle: {
-                fill: KhanUtil.ORANGE,
-                stroke: KhanUtil.ORANGE
-            },
+            normalStyle: {},
             highlightStyle: {
-                fill: KhanUtil.ORANGE,
-                stroke: KhanUtil.ORANGE
+                fill: KhanUtil.INTERACTING,
+                stroke: KhanUtil.INTERACTING
             },
             labelStyle: {
-                color: KhanUtil.BLUE
+                color: KhanUtil.INTERACTIVE
             },
-            vertexLabel: ""
+            vertexLabel: "",
+            mouseTarget: null
         }, options);
+
+        var normalColor = (movablePoint.constraints.fixed) ?
+                                  KhanUtil.DYNAMIC
+                                : KhanUtil.INTERACTIVE;
+        movablePoint.normalStyle = _.extend({}, {
+            "fill": normalColor,
+            "stroke": normalColor
+        }, options.normalStyle);
 
         // deprecated: don't use coordX/coordY; use coord[]
         if (options.coordX !== undefined) {
@@ -831,13 +911,25 @@ $.extend(KhanUtil.Graphie.prototype, {
 
         movablePoint.coord = applySnapAndConstraints(movablePoint.coord);
 
+        var highlightScale = 2;
+
         if (movablePoint.visible) {
             graph.style(movablePoint.normalStyle, function() {
-                movablePoint.visibleShape = graph.ellipse(movablePoint.coord, [movablePoint.pointSize / graph.scale[0], movablePoint.pointSize / graph.scale[1]]);
+                var radii = [
+                    movablePoint.pointSize / graph.scale[0],
+                    movablePoint.pointSize / graph.scale[1]
+                ];
+                var options = {
+                    maxScale: highlightScale
+                };
+                movablePoint.visibleShape = new WrappedEllipse(graph,
+                    movablePoint.coord, radii, options);
+                movablePoint.visibleShape.attr(_.omit(movablePoint.normalStyle, "scale"));
+                movablePoint.visibleShape.toFront();
             });
         }
         movablePoint.normalStyle.scale = 1;
-        movablePoint.highlightStyle.scale = 2;
+        movablePoint.highlightStyle.scale = highlightScale;
 
         if (movablePoint.vertexLabel) {
             movablePoint.labeledVertex = this.label([0, 0], "", "center", movablePoint.labelStyle);
@@ -856,14 +948,94 @@ $.extend(KhanUtil.Graphie.prototype, {
 
         movablePoint.drawLabel();
 
+        movablePoint.grab = function() {
+            $(document).bind("vmousemove.point vmouseup.point", function(event) {
+                event.preventDefault();
+                movablePoint.dragging = true;
+                KhanUtil.dragging = true;
+
+                var coord = graph.getMouseCoord(event);
+
+                coord = applySnapAndConstraints(coord);
+                var coordX = coord[0];
+                var coordY = coord[1];
+                var mouseX;
+                var mouseY;
+
+                if (event.type === "vmousemove") {
+                    var doMove = true;
+                    // The caller has the option of adding an onMove() method to the
+                    // movablePoint object we return as a sort of event handler
+                    // By returning false from onMove(), the move can be vetoed,
+                    // providing custom constraints on where the point can be moved.
+                    // By returning array [x, y], the move can be overridden
+                    if (_.isFunction(movablePoint.onMove)) {
+                        var result = movablePoint.onMove(coordX, coordY);
+                        if (result === false) {
+                            doMove = false;
+                        }
+                        if (_.isArray(result)) {
+                            coordX = result[0];
+                            coordY = result[1];
+                        }
+                    }
+                    // coord{X|Y} may have been modified by constraints or onMove handler; adjust mouse{X|Y} to match
+                    mouseX = (coordX - graph.range[0][0]) * graph.scale[0];
+                    mouseY = (-coordY + graph.range[1][1]) * graph.scale[1];
+
+                    if (doMove) {
+                        var point = graph.unscalePoint([mouseX, mouseY]);
+                        movablePoint.visibleShape.moveTo(point);
+                        movablePoint.mouseTarget.moveTo(point);
+                        movablePoint.coord = [coordX, coordY];
+                        movablePoint.updateLineEnds();
+                        $(movablePoint).trigger("move");
+                    }
+
+                    movablePoint.drawLabel();
+
+                } else if (event.type === "vmouseup") {
+                    $(document).unbind(".point");
+                    movablePoint.dragging = false;
+                    KhanUtil.dragging = false;
+                    if (_.isFunction(movablePoint.onMoveEnd)) {
+                        var result = movablePoint.onMoveEnd(coordX, coordY);
+                        if (_.isArray(result)) {
+                            coordX = result[0];
+                            coordY = result[1];
+                            mouseX = (coordX - graph.range[0][0]) * graph.scale[0];
+                            mouseY = (-coordY + graph.range[1][1]) * graph.scale[1];
+                            var point = graph.unscalePoint([mouseX, mouseY]);
+                            movablePoint.visibleShape.moveTo(point);
+                            movablePoint.mouseTarget.moveTo(point);
+                            movablePoint.coord = [coordX, coordY];
+                        }
+                    }
+                    if (!movablePoint.highlight) {
+                        movablePoint.visibleShape.animate(movablePoint.normalStyle, 50);
+                        if (movablePoint.onUnhighlight) {
+                            movablePoint.onUnhighlight();
+                        }
+                    }
+                }
+            });
+        };
 
         if (movablePoint.visible && !movablePoint.constraints.fixed) {
             // the invisible shape in front of the point that gets mouse events
-            movablePoint.mouseTarget = graph.mouselayer.circle(graph.scalePoint(movablePoint.coord)[0], graph.scalePoint(movablePoint.coord)[1], 15);
-            movablePoint.mouseTarget.attr({fill: "#000", "opacity": 0.0});
+            if (!movablePoint.mouseTarget) {
+                var radii = graph.unscaleVector(15);
+                var options = {
+                    mouselayer: true
+                };
+                movablePoint.mouseTarget = new WrappedEllipse(graph,
+                    movablePoint.coord, radii, options);
+                movablePoint.mouseTarget.attr({fill: "#000", opacity: 0.0});
+            }
 
-            $(movablePoint.mouseTarget[0]).css("cursor", "move");
-            $(movablePoint.mouseTarget[0]).bind("vmousedown vmouseover vmouseout", function(event) {
+            var $mouseTarget = $(movablePoint.mouseTarget.getMouseTarget());
+            $mouseTarget.css("cursor", "move");
+            $mouseTarget.bind("vmousedown vmouseover vmouseout", function(event) {
                 if (event.type === "vmouseover") {
                     movablePoint.highlight = true;
                     if (!KhanUtil.dragging) {
@@ -875,7 +1047,7 @@ $.extend(KhanUtil.Graphie.prototype, {
 
                 } else if (event.type === "vmouseout") {
                     movablePoint.highlight = false;
-                    if (!movablePoint.dragging) {
+                    if (!movablePoint.dragging && !KhanUtil.dragging) {
                         movablePoint.visibleShape.animate(movablePoint.normalStyle, 50);
                         if (movablePoint.onUnhighlight) {
                             movablePoint.onUnhighlight();
@@ -885,79 +1057,7 @@ $.extend(KhanUtil.Graphie.prototype, {
                 } else if (event.type === "vmousedown" && (event.which === 1 || event.which === 0)) {
                     event.preventDefault();
 
-                    $(document).bind("vmousemove vmouseup", function(event) {
-                        event.preventDefault();
-                        movablePoint.dragging = true;
-                        KhanUtil.dragging = true;
-
-                        var coord = graph.getMouseCoord(event);
-
-                        coord = applySnapAndConstraints(coord);
-                        var coordX = coord[0];
-                        var coordY = coord[1];
-                        var mouseX;
-                        var mouseY;
-
-                        if (event.type === "vmousemove") {
-                            var doMove = true;
-                            // The caller has the option of adding an onMove() method to the
-                            // movablePoint object we return as a sort of event handler
-                            // By returning false from onMove(), the move can be vetoed,
-                            // providing custom constraints on where the point can be moved.
-                            // By returning array [x, y], the move can be overridden
-                            if (_.isFunction(movablePoint.onMove)) {
-                                var result = movablePoint.onMove(coordX, coordY);
-                                if (result === false) {
-                                    doMove = false;
-                                }
-                                if (_.isArray(result)) {
-                                    coordX = result[0];
-                                    coordY = result[1];
-                                }
-                            }
-                            // coord{X|Y} may have been modified by constraints or onMove handler; adjust mouse{X|Y} to match
-                            mouseX = (coordX - graph.range[0][0]) * graph.scale[0];
-                            mouseY = (-coordY + graph.range[1][1]) * graph.scale[1];
-
-                            if (doMove) {
-                                movablePoint.visibleShape.attr("cx", mouseX);
-                                movablePoint.mouseTarget.attr("cx", mouseX);
-                                movablePoint.visibleShape.attr("cy", mouseY);
-                                movablePoint.mouseTarget.attr("cy", mouseY);
-                                movablePoint.coord = [coordX, coordY];
-                                movablePoint.updateLineEnds();
-                                $(movablePoint).trigger("move");
-                            }
-
-                            movablePoint.drawLabel();
-
-                        } else if (event.type === "vmouseup") {
-                            $(document).unbind("vmousemove vmouseup");
-                            movablePoint.dragging = false;
-                            KhanUtil.dragging = false;
-                            if (_.isFunction(movablePoint.onMoveEnd)) {
-                                var result = movablePoint.onMoveEnd(coordX, coordY);
-                                if (_.isArray(result)) {
-                                    coordX = result[0];
-                                    coordY = result[1];
-                                    mouseX = (coordX - graph.range[0][0]) * graph.scale[0];
-                                    mouseY = (-coordY + graph.range[1][1]) * graph.scale[1];
-                                    movablePoint.visibleShape.attr("cx", mouseX);
-                                    movablePoint.mouseTarget.attr("cx", mouseX);
-                                    movablePoint.visibleShape.attr("cy", mouseY);
-                                    movablePoint.mouseTarget.attr("cy", mouseY);
-                                    movablePoint.coord = [coordX, coordY];
-                                }
-                            }
-                            // FIXME: check is commented out since firefox isn't always sending mouseout for some reason
-                            //if (!movablePoint.highlight) {
-                                movablePoint.visibleShape.animate(movablePoint.normalStyle, 50);
-                                if (movablePoint.onUnhighlight) {
-                                    movablePoint.onUnhighlight();
-                                }
-                            //}
-                        }
-                    });
+                    movablePoint.grab();
                 }
             });
         }
@@ -971,32 +1071,13 @@ $.extend(KhanUtil.Graphie.prototype, {
             // 5ms per pixel seems good
             var time = distance * 5;
 
-            var scaled = graph.scalePoint([coordX, coordY]);
-            var end = { cx: scaled[0], cy: scaled[1] };
-            if (updateLines) {
-                var start = {
-                    cx: this.visibleShape.attr("cx"),
-                    cy: this.visibleShape.attr("cy")
-                };
-                $(start).animate(end, {
-                    duration: time,
-                    easing: "linear",
-                    step: function(now, fx) {
-                        movablePoint.visibleShape.attr(fx.prop, now);
-                        movablePoint.mouseTarget.attr(fx.prop, now);
-                        if (fx.prop === "cx") {
-                            movablePoint.coord[0] = now / graph.scale[0] + graph.range[0][0];
-                        } else {
-                            movablePoint.coord[1] = graph.range[1][1] - now / graph.scale[1];
-                        }
-                        movablePoint.updateLineEnds();
-                    }
-                });
-
-            } else {
-                this.visibleShape.animate(end, time);
-                this.mouseTarget.animate(end, time);
-            }
+            // Update the line on each step of the animation, if necessary
+            var cb = updateLines && function(coord) {
+                movablePoint.coord = coord;
+                movablePoint.updateLineEnds();
+            };
+            this.visibleShape.animateTo([coordX, coordY], time, cb);
+            this.mouseTarget.animateTo([coordX, coordY], time, cb);
             this.coord = [coordX, coordY];
             if (_.isFunction(this.onMove)) {
                 this.onMove(coordX, coordY);
@@ -1022,15 +1103,17 @@ $.extend(KhanUtil.Graphie.prototype, {
         // Put the point at a new position without any checks, animation, or callbacks
         movablePoint.setCoord = function(coord) {
             if (this.visible) {
-                var scaledPoint = graph.scalePoint(coord);
-                this.visibleShape.attr({ cx: scaledPoint[0] });
-                this.visibleShape.attr({ cy: scaledPoint[1] });
+                this.visibleShape.moveTo(coord);
                 if (this.mouseTarget != null) {
-                    this.mouseTarget.attr({ cx: scaledPoint[0] });
-                    this.mouseTarget.attr({ cy: scaledPoint[1] });
+                    this.mouseTarget.moveTo(coord);
                 }
             }
             this.coord = coord.slice();
+        };
+
+        // Put the point at the new position, checking that it is within the graph's bounds
+        movablePoint.setCoordConstrained = function(coord) {
+            this.setCoord(applySnapAndConstraints(coord));
         };
 
         // Change z-order to back
@@ -1094,7 +1177,7 @@ $.extend(KhanUtil.Graphie.prototype, {
         graph.style({
             stroke: KhanUtil.BLUE
         }, function() {
-            interactiveFn.visibleShape = graph.plot(fn, options.range);
+            interactiveFn.visibleShape = graph.plot(fn, options.range, options.swapAxes);
         });
 
         // Draw a circle that will be used to highlight the point on the function the mouse is closest to
@@ -1118,6 +1201,15 @@ $.extend(KhanUtil.Graphie.prototype, {
         var mouseAreaWidth = 30;
         var points = [];
         var step = (options.range[1] - options.range[0]) / 100;
+
+        var addScaledPoint = function(x, y) {
+            if (options.swapAxes) {
+                points.push([(y - graph.range[0][0]) * graph.scale[0], (graph.range[1][1] - x) * graph.scale[1]]);
+            } else {
+                points.push([(x - graph.range[0][0]) * graph.scale[0], (graph.range[1][1] - y) * graph.scale[1]]);
+            }
+        };
+
         // Draw a curve parallel to, but (mouseAreaWidth/2 pixels) above the function
         for (var x = options.range[0]; x <= options.range[1]; x += step) {
             var ddx = (fn(x - 0.001) - fn(x + 0.001)) / 0.002;
@@ -1134,7 +1226,7 @@ $.extend(KhanUtil.Graphie.prototype, {
                     y1 = normalslope * (x - x1) + fn(x);
                 }
             }
-            points.push([(x1 - graph.range[0][0]) * graph.scale[0], (graph.range[1][1] - y1) * graph.scale[1]]);
+            addScaledPoint(x1, y1);
         }
         // Draw a curve parallel to, but (mouseAreaWidth/2 pixels) below the function
         for (var x = options.range[1]; x >= options.range[0]; x -= step) {
@@ -1152,11 +1244,11 @@ $.extend(KhanUtil.Graphie.prototype, {
                     y1 = normalslope * (x - x1) + fn(x);
                 }
             }
-            points.push([(x1 - graph.range[0][0]) * graph.scale[0], (graph.range[1][1] - y1) * graph.scale[1]]);
+            addScaledPoint(x1, y1);
         }
+
         // plot the polygon and make it invisible
-        interactiveFn.mouseTarget = graph.mouselayer.path(
-                KhanUtil.unscaledSvgPath(points));
+        interactiveFn.mouseTarget = graph.mouselayer.path(KhanUtil.unscaledSvgPath(points));
         interactiveFn.mouseTarget.attr({ fill: "#000", "opacity": 0.0 });
 
         // Add mouse handlers to the polygon
@@ -1176,20 +1268,30 @@ $.extend(KhanUtil.Graphie.prototype, {
             var coordY = graph.range[1][1] - mouseY / graph.scale[1];
 
             // Find the closest point on the curve to the mouse (by brute force)
-            var closestX = 0;
-            var minDist = Math.sqrt((coordX) * (coordX) + (coordY) * (coordY));
-            for (var x = options.range[0]; x < options.range[1]; x += ((options.range[1] - options.range[0]) / graph.xpixels)) {
-                if (Math.sqrt((x - coordX) * (x - coordX) + (fn(x) - coordY) * (fn(x) - coordY)) < minDist) {
-                    closestX = x;
-                    minDist = Math.sqrt((x - coordX) * (x - coordX) + (fn(x) - coordY) * (fn(x) - coordY));
+            var findDistance = function(coordX, coordY) {
+                var closestX = 0;
+                var minDist = Math.sqrt((coordX) * (coordX) + (coordY) * (coordY));
+                for (var x = options.range[0]; x < options.range[1]; x += ((options.range[1] - options.range[0]) / graph.xpixels)) {
+                    if (Math.sqrt((x - coordX) * (x - coordX) + (fn(x) - coordY) * (fn(x) - coordY)) < minDist) {
+                        closestX = x;
+                        minDist = Math.sqrt((x - coordX) * (x - coordX) + (fn(x) - coordY) * (fn(x) - coordY));
+                    }
                 }
+                return closestX;
+            };
+
+            if (options.swapAxes) {
+                var closestX = findDistance(coordY, coordX);
+                coordX = fn(closestX);
+                coordY = closestX;
+            } else {
+                var closestX = findDistance(coordX, coordY);
+                coordX = closestX;
+                coordY = fn(closestX);
             }
 
-            interactiveFn.cursorPoint.attr("cx", (graph.range[0][1] + closestX) * graph.scale[0]);
-            interactiveFn.cursorPoint.attr("cy", (graph.range[1][1] - fn(closestX)) * graph.scale[1]);
-
-            coordX = closestX;
-            coordY = fn(closestX);
+            interactiveFn.cursorPoint.attr("cx", (graph.range[0][1] + coordX) * graph.scale[0]);
+            interactiveFn.cursorPoint.attr("cy", (graph.range[1][1] - coordY) * graph.scale[1]);
 
             // If the caller wants to be notified when the user points to the function
             if (_.isFunction(interactiveFn.onMove)) {
@@ -1248,17 +1350,14 @@ $.extend(KhanUtil.Graphie.prototype, {
             snapY: 0,
             fixed: false,
             ticks: 0,
-            normalStyle: {
-                "stroke": KhanUtil.BLUE,
-                "stroke-width": 2
-            },
+            normalStyle: {},
             highlightStyle: {
-                "stroke": KhanUtil.ORANGE,
+                "stroke": KhanUtil.INTERACTING,
                 "stroke-width": 6
             },
             labelStyle: {
-                "stroke": KhanUtil.BLUE,
-                "color": KhanUtil.BLUE
+                "stroke": KhanUtil.INTERACTIVE,
+                "color": KhanUtil.INTERACTIVE
             },
             highlight: false,
             dragging: false,
@@ -1276,6 +1375,17 @@ $.extend(KhanUtil.Graphie.prototype, {
             numTicks: 0,
             movePointsWithLine: false
         }, options);
+
+        var normalColor = (lineSegment.fixed) ? KhanUtil.DYNAMIC
+                                              : KhanUtil.INTERACTIVE;
+        lineSegment.normalStyle = _.extend({}, {
+            "stroke-width": 2,
+            "stroke": normalColor
+        }, options.normalStyle);
+        // arrowStyle should be kept in sync with styling of the line
+        lineSegment.arrowStyle = _.extend({}, lineSegment.normalStyle, {
+            "color": lineSegment.normalStyle.stroke
+        });
 
         // If the line segment is defined by movablePoints, coordA/coordZ are
         // owned by the points, otherwise they're owned by us
@@ -1304,18 +1414,26 @@ $.extend(KhanUtil.Graphie.prototype, {
             var tickoffset = 0.5 - ((lineSegment.ticks - 1) + (i * 2)) / graph.scale[0];
             path += KhanUtil.unscaledSvgPath([[tickoffset, -7], [tickoffset, 7]]);
         }
-        lineSegment.visibleLine = graph.raphael.path(path);
+
+        // Create and style visible shape
+        var options = {
+            thickness: Math.max(
+                lineSegment.normalStyle["stroke-width"],
+                lineSegment.highlightStyle["stroke-width"]
+            )
+        };
+        lineSegment.visibleLine = new WrappedLine(graph, [0, 0], [1, 0],
+            options);
         lineSegment.visibleLine.attr(lineSegment.normalStyle);
-        // Clip the line 5px from the edge of the graphie to allow for
-        // arrowheads
-        if (lineSegment.extendLine || lineSegment.extendRay) {
-            lineSegment.visibleLine.attr({
-                "clip-rect": "5 5 " + (graph.dimensions[0] - 10) + " " +
-                    (graph.dimensions[1] - 10)
-            });
-        }
+
+        // Add mouse target
         if (!lineSegment.fixed) {
-            lineSegment.mouseTarget = graph.mouselayer.rect(0, -15, 1, 30);
+            var options = {
+                thickness: 30,
+                mouselayer: true
+            };
+            lineSegment.mouseTarget = new WrappedLine(graph, [0, 0], [1, 0],
+                options);
             lineSegment.mouseTarget.attr({fill: "#000", "opacity": 0.0});
         }
 
@@ -1332,82 +1450,155 @@ $.extend(KhanUtil.Graphie.prototype, {
                     this.coordZ = this.pointZ.coord;
                 }
             }
-            var scaledA = graph.scalePoint(this.coordA);
-            var scaledZ = graph.scalePoint(this.coordZ);
-            var angle = KhanUtil.findAngle(scaledZ, scaledA);
-            var lineLength = KhanUtil.getDistance(scaledZ, scaledA);
+
+            // Given a line, find the angle between the endpoints
+            var getScaledAngle = function(line) {
+                var scaledA = line.graph.scalePoint(line.coordA);
+                var scaledZ = line.graph.scalePoint(line.coordZ);
+                return kvector.polarDegFromCart(
+                    kvector.subtract(
+                        scaledZ,
+                        scaledA
+                    )
+                )[1];
+            };
+
+            // Given `coord` and `angle`, find the point where a line extended
+            // from `coord` in the direction of `angle` would be clipped by the
+            // edge of the graphie canvas.
+            var getClipPoint = function(graph, coord, angle) {
+                var graph = lineSegment.graph;
+                // Actually put the arrowheads 4px from the edge so they have
+                // a bit of room
+                var xExtent = graph.range[0][1] - graph.range[0][0];
+                var yExtent = graph.range[1][1] - graph.range[1][0];
+
+                // shoot a point off into the distance ...
+                var distance = xExtent + yExtent;
+                // we need to scale the point according to the scale of the axes
+                var angleVec = graph.unscaleVector(
+                    kvector.cartFromPolarDeg([1, angle])
+                );
+                var distVec = kvector.scale(
+                    kvector.normalize(angleVec),
+                    distance
+                );
+                var farCoord = kvector.add(coord, distVec);
+                var scaledAngle = kvector.polarDegFromCart(angleVec)[1];
+                // ... and then bring it back
+                var clipPoint = graph.constrainToBoundsOnAngle(farCoord, 4,
+                                              scaledAngle * Math.PI / 180);
+                return clipPoint;
+            };
+
+            var angle = getScaledAngle(this);
+            var start = this.coordA;
+            var end = this.coordZ;
+
+            // Extend start, end if necessary (i.e., if not a line segment)
+            if (this.extendLine) {
+                start = getClipPoint(graph, start, 360 - angle);
+                end = getClipPoint(graph, end, (540 - angle) % 360);
+            } else if (this.extendRay) {
+                end = getClipPoint(graph, start, 360 - angle);
+            }
 
             var elements = [this.visibleLine];
             if (!this.fixed) {
                 elements.push(this.mouseTarget);
             }
             _.each(elements, function(element) {
-                element.translate(scaledA[0] - element.attr("translation").x,
-                        scaledA[1] - element.attr("translation").y);
-                element.rotate(angle, scaledA[0], scaledA[1]);
-                if (this.extendLine) {
-                    element.translate(-0.5, 0);
-                    lineLength = graph.dimensions[0] + graph.dimensions[1];
-                    lineLength = 2 * lineLength;
-                } else if (this.extendRay) {
-                    lineLength = graph.dimensions[0] + graph.dimensions[1];
-                }
-                element.scale(lineLength, 1, scaledA[0], scaledA[1]);
-            }, this);
+                element.moveTo(start, end);
+            });
 
-            // Temporary objects: array of SVG nodes that get recreated on drag
-            _.invoke(this.temp, "remove");
-            this.temp = [];
+            // Draw an arrowhead at the end of the line
+            var createArrow = function(graph, style) {
+                // Points that define the arrowhead
+                var center = [0.75, 0];
+                var points = [
+                    [-3, 4],
+                    [-2.75, 2.5],
+                    [0, 0.25],
+                    center,
+                    [0, -0.25],
+                    [-2.75, -2.5],
+                    [-3, -4]
+                ];
 
-            // Given `coord` and `angle`, find the point where a line extended
-            // from `coord` in the direction of `angle` would be clipped by the
-            // edge of the graphie canvas. Then draw an arrowhead at that point
-            // pointing in the direction of `angle`.
-            var drawArrowAtClipPoint = function(coord, angle) {
-                var graph = lineSegment.graph;
-                // Actually put the arrowheads 4px from the edge so they have
-                // a bit of room
-                var range = [[graph.range[0][0] + 4 / graph.scale[0],
-                              graph.range[0][1] - 4 / graph.scale[0]], [
-                              graph.range[1][0] + 4 / graph.scale[1],
-                              graph.range[1][1] - 4 / graph.scale[1]]];
-                // Find the angle between the point and each corner
-                var neAngle = KhanUtil.findAngle([range[0][1], range[1][1]], coord);
-                var nwAngle = KhanUtil.findAngle([range[0][0], range[1][1]], coord);
-                var swAngle = KhanUtil.findAngle([range[0][0], range[1][0]], coord);
-                var seAngle = KhanUtil.findAngle([range[0][1], range[1][0]], coord);
-                var clipPoint;
-                if (neAngle <= angle && angle <= nwAngle) {
-                    // clipped by top edge
-                    clipPoint = [coord[0] + (range[1][1] - coord[1]) * 1 / Math.tan(angle * Math.PI / 180), range[1][1]];
-                } else if (swAngle <= angle && angle <= seAngle) {
-                    // clipped by bottom edge
-                    clipPoint = [coord[0] + (range[1][0] - coord[1]) * 1 / Math.tan(angle * Math.PI / 180), range[1][0]];
-                } else if (nwAngle <= angle && angle <= swAngle) {
-                    // clipped by left edge
-                    clipPoint = [range[0][0], coord[1] + (range[0][0] - coord[0]) * Math.tan(angle * Math.PI / 180)];
-                } else {
-                    // clipped by right edge
-                    clipPoint = [range[0][1], coord[1] + (range[0][1] - coord[0]) * Math.tan(angle * Math.PI / 180)];
-                }
-                clipPoint = graph.scalePoint(clipPoint);
+                // Scale points by 1.4 around (0.75, 0)
+                var scale = 1.4;
+                points = _.map(points, function(point) {
+                    var pv = kvector.subtract(point, center);
+                    var pvScaled = kvector.scale(pv, scale);
+                    return kvector.add(center, pvScaled);
+                });
 
-                var arrowHead = graph.raphael.path("M-3 4 C-2.75 2.5 0 0.25 0.75 0C0 -0.25 -2.75 -2.5 -3 -4");
-                arrowHead.rotate(360 - angle, 0.75, 0)
-                    .scale(1.4, 1.4, 0.75, 0)
-                    .translate(clipPoint[0], clipPoint[1])
-                    .attr(lineSegment.normalStyle)
-                    .attr({ "stroke-linejoin": "round", "stroke-linecap": "round", "stroke-dasharray": "" });
+                // We can't just pass in a path to `graph.fixedPath` as we need to modify
+                // the points in some way, so instead we provide a function for creating
+                // the path once the points have been transformed
+                var createCubicPath = function(points) {
+                    var path = "M" + points[0][0] + " " + points[0][1];
+                    for (var i = 1; i < points.length; i += 3) {
+                        path += "C" + points[i][0] + " " + points[i][1] + " " +
+                                      points[i + 1][0] + " " + points[i + 1][1] + " " +
+                                      points[i + 2][0] + " " + points[i + 2][1];
+                    }
+                    return path;
+                };
+
+                // Create arrowhead
+                var unscaledPoints = _.map(points, graph.unscalePoint);
+                var options = {
+                    center: graph.unscalePoint(center),
+                    createPath: createCubicPath
+                };
+                var arrowHead = new WrappedPath(graph, unscaledPoints, options);
+                arrowHead.attr(_.extend({
+                    "stroke-linejoin": "round",
+                    "stroke-linecap": "round",
+                    "stroke-dasharray": ""
+                }, style));
+
+                // Add custom function for transforming arrowheads that accounts for
+                // center, scaling, etc.
+                arrowHead.toCoordAtAngle = function(coord, angle) {
+                    var clipPoint = graph.scalePoint(getClipPoint(graph, coord, angle));
+                    var do3dTransform = KhanUtil.getCanUse3dTransform();
+                    arrowHead.transform(
+                        "translateX(" + (clipPoint[0] + scale * center[0]) + "px) " +
+                        "translateY(" + (clipPoint[1] + scale * center[1]) + "px) " +
+                        (do3dTransform ? "translateZ(0) " : "") +
+                        "rotate(" + (360 - KhanUtil.bound(angle)) + "deg)");
+                };
 
                 return arrowHead;
             };
 
-            if (this.extendLine) {
-                this.temp.push(drawArrowAtClipPoint(this.coordA, 360 - angle));
-                this.temp.push(drawArrowAtClipPoint(this.coordZ, (540 - angle) % 360));
-            } else if (this.extendRay) {
-                this.temp.push(drawArrowAtClipPoint(this.coordA, 360 - angle));
+            // Add arrows
+            if (this._arrows == null) {
+                this._arrows = [];
+
+                if (this.extendLine) {
+                    this._arrows.push(createArrow(
+                        graph, this.normalStyle));
+                    this._arrows.push(createArrow(
+                        graph, this.normalStyle));
+                } else if (this.extendRay) {
+                    this._arrows.push(createArrow(
+                        graph, this.normalStyle));
+                }
             }
+
+            // Move and rotate arrows to appropriate coordinate and angle
+            var coordForArrow = [this.coordA, this.coordZ];
+            var angleForArrow = [360 - angle, (540 - angle) % 360];
+            _.each(this._arrows, function(arrow, i) {
+                arrow.toCoordAtAngle(coordForArrow[i], angleForArrow[i]);
+            });
+
+            // Temporary objects: array of SVG nodes that get recreated on drag
+            _.invoke(this.temp, "remove");
+            this.temp = [];
 
             // Labels are always above line, unless vertical (if so, on right)
             // probably want to add an option to flip this at will!
@@ -1480,6 +1671,9 @@ $.extend(KhanUtil.Graphie.prototype, {
             if (lineSegment.labeledVertices) {
                 _.invoke(lineSegment.labeledVertices, "remove");
             }
+            if (lineSegment._arrows) {
+                _.invoke(lineSegment._arrows, "remove");
+            }
             if (lineSegment.temp.length) {
                 _.invoke(lineSegment.temp, "remove");
             }
@@ -1490,12 +1684,18 @@ $.extend(KhanUtil.Graphie.prototype, {
             if (lineSegment.temp.length) {
                 _.invoke(lineSegment.temp, "hide");
             }
+            if (lineSegment._arrows) {
+                _.invoke(lineSegment._arrows, "hide");
+            }
         };
 
         lineSegment.show = function() {
             lineSegment.visibleLine.show();
             if (lineSegment.temp.length) {
                 _.invoke(lineSegment.temp, "show");
+            }
+            if (lineSegment._arrows) {
+                _.invoke(lineSegment._arrows, "show");
             }
         };
 
@@ -1510,18 +1710,29 @@ $.extend(KhanUtil.Graphie.prototype, {
         }
 
         if (!lineSegment.fixed && !lineSegment.constraints.fixed) {
-            $(lineSegment.mouseTarget[0]).css("cursor", "move");
-            $(lineSegment.mouseTarget[0]).bind("vmousedown vmouseover vmouseout", function(event) {
+            var $mouseTarget = $(lineSegment.mouseTarget.getMouseTarget());
+            $mouseTarget.css("cursor", "move");
+            $mouseTarget.bind("vmousedown vmouseover vmouseout", function(event) {
                 if (event.type === "vmouseover") {
                     if (!KhanUtil.dragging) {
                         lineSegment.highlight = true;
                         lineSegment.visibleLine.animate(lineSegment.highlightStyle, 50);
+                        lineSegment.arrowStyle = _.extend({}, lineSegment.arrowStyle, {
+                            "color": lineSegment.highlightStyle.stroke,
+                            "stroke": lineSegment.highlightStyle.stroke
+                        });
+                        lineSegment.transform();
                     }
 
                 } else if (event.type === "vmouseout") {
                     lineSegment.highlight = false;
                     if (!lineSegment.dragging) {
                         lineSegment.visibleLine.animate(lineSegment.normalStyle, 50);
+                        lineSegment.arrowStyle = _.extend({}, lineSegment.arrowStyle, {
+                            "color": lineSegment.normalStyle.stroke,
+                            "stroke": lineSegment.normalStyle.stroke
+                        });
+                        lineSegment.transform();
                     }
 
                 } else if (event.type === "vmousedown" && (event.which === 1 || event.which === 0)) {
@@ -1545,7 +1756,7 @@ $.extend(KhanUtil.Graphie.prototype, {
                     var offsetTop = Math.max(graph.scaleVector(mouseOffsetA)[1], graph.scaleVector(mouseOffsetZ)[1]);
                     var offsetBottom = -Math.min(graph.scaleVector(mouseOffsetA)[1], graph.scaleVector(mouseOffsetZ)[1]);
 
-                    $(document).bind("vmousemove vmouseup", function(event) {
+                    $(document).bind("vmousemove.lineSegment vmouseup.lineSegment", function(event) {
                         event.preventDefault();
                         lineSegment.dragging = true;
                         KhanUtil.dragging = true;
@@ -1603,17 +1814,24 @@ $.extend(KhanUtil.Graphie.prototype, {
                             }
 
                         } else if (event.type === "vmouseup") {
-                            $(document).unbind("vmousemove vmouseup");
+                            $(document).unbind(".lineSegment");
                             lineSegment.dragging = false;
                             KhanUtil.dragging = false;
                             if (!lineSegment.highlight) {
                                 lineSegment.visibleLine.animate(lineSegment.normalStyle, 50);
+                                lineSegment.arrowStyle = _.extend({}, lineSegment.arrowStyle, {
+                                    "color": lineSegment.normalStyle.stroke,
+                                    "stroke": lineSegment.normalStyle.stroke
+                                });
+                                lineSegment.transform();
                             }
                             if (_.isFunction(lineSegment.onMoveEnd)) {
                                 lineSegment.onMoveEnd();
                             }
 
                         }
+
+                        $(lineSegment).trigger("move");
                     });
                 }
             });
@@ -1656,39 +1874,49 @@ $.extend(KhanUtil.Graphie.prototype, {
         var graphie = this;
 
         var polygon = $.extend({
-            points: [],
             snapX: 0,
             snapY: 0,
             fixed: false,
             constrainToGraph: true,
-            normalStyle: {
-                "stroke": KhanUtil.BLUE,
-                "stroke-width": 2,
-                "fill": KhanUtil.ORANGE,
-                "fill-opacity": 0
-            },
+            normalStyle: {},
             highlightStyle: {
-                "stroke": KhanUtil.ORANGE,
+                "stroke": KhanUtil.INTERACTING,
                 "stroke-width": 2,
-                "fill": KhanUtil.ORANGE,
+                "fill": KhanUtil.INTERACTING,
                 "fill-opacity": 0.05
             },
             pointHighlightStyle: {
-                "fill": KhanUtil.ORANGE,
-                "stroke": KhanUtil.ORANGE
+                "fill": KhanUtil.INTERACTING,
+                "stroke": KhanUtil.INTERACTING
             },
             labelStyle: {
-                "stroke": KhanUtil.BLUE,
+                "stroke": KhanUtil.DYNAMIC,
                 "stroke-width": 1,
-                "color": KhanUtil.BLUE
+                "color": KhanUtil.DYNAMIC
             },
             angleLabels: [],
+            showRightAngleMarkers: [],
             sideLabels: [],
             vertexLabels: [],
             numArcs: [],
             numArrows: [],
-            numTicks: []
-        }, options);
+            numTicks: [],
+            updateOnPointMove: true,
+            closed: true
+        }, _.omit(options, "points"));
+
+        var normalColor = (polygon.fixed) ? KhanUtil.DYNAMIC
+                                          : KhanUtil.INTERACTIVE;
+        polygon.normalStyle = _.extend({
+            "stroke-width": 2,
+            "fill-opacity": 0,
+            "fill": normalColor,
+            "stroke": normalColor
+        }, options.normalStyle);
+
+        // don't deep copy the points array with $.extend;
+        // we may want to append to it later for click-to-add-points
+        polygon.points = options.points;
 
         var isPoint = function(coordOrPoint) {
             return !_.isArray(coordOrPoint);
@@ -1698,11 +1926,11 @@ $.extend(KhanUtil.Graphie.prototype, {
             var n = polygon.points.length;
 
             // Update coords
-            _.each(polygon.points, function(coordOrPoint, i) {
+            polygon.coords = _.map(polygon.points, function(coordOrPoint, i) {
                 if (isPoint(coordOrPoint)) {
-                    polygon.coords[i] = coordOrPoint.coord;
+                    return coordOrPoint.coord;
                 } else {
-                    polygon.coords[i] = coordOrPoint;
+                    return coordOrPoint;
                 }
             });
 
@@ -1718,7 +1946,18 @@ $.extend(KhanUtil.Graphie.prototype, {
             });
 
             // Create path
-            polygon.path = KhanUtil.unscaledSvgPath(scaledCoords.concat(true));
+            if (polygon.closed) {
+                scaledCoords.push(true);
+            } else {
+                // For open polygons, concatenate a reverse of the path,
+                // to remove the inside area of the path, which would
+                // otherwise be clickable (even if the closing line segment
+                // wasn't drawn
+                scaledCoords = scaledCoords.concat(
+                    _.clone(scaledCoords).reverse()
+                );
+            }
+            polygon.path = KhanUtil.unscaledSvgPath(scaledCoords);
 
             // Temporary objects
             _.invoke(polygon.temp, "remove");
@@ -1728,7 +1967,8 @@ $.extend(KhanUtil.Graphie.prototype, {
             var isClockwise = clockwise(polygon.coords);
 
             // Update angle labels
-            if (polygon.angleLabels.length) {
+            if (polygon.angleLabels.length ||
+                    polygon.showRightAngleMarkers.length) {
                 _.each(polygon.labeledAngles, function(label, i) {
                     polygon.temp.push(graphie.labelAngle({
                         point1: polygon.coords[(i - 1 + n) % n],
@@ -1736,6 +1976,7 @@ $.extend(KhanUtil.Graphie.prototype, {
                         point3: polygon.coords[(i + 1) % n],
                         label: label,
                         text: polygon.angleLabels[i],
+                        showRightAngleMarker: polygon.showRightAngleMarkers[i],
                         numArcs: polygon.numArcs[i],
                         clockwise: isClockwise,
                         style: polygon.labelStyle
@@ -1829,14 +2070,19 @@ $.extend(KhanUtil.Graphie.prototype, {
 
         // Setup
 
-        _.each(_.filter(polygon.points, isPoint), function(coordOrPoint) {
-            coordOrPoint.polygonVertices.push(polygon);
-        });
+        if (polygon.updateOnPointMove) {
+            _.each(_.filter(polygon.points, isPoint), function(coordOrPoint) {
+                coordOrPoint.polygonVertices.push(polygon);
+            });
+        }
 
         polygon.coords = new Array(polygon.points.length);
 
         if (polygon.angleLabels.length) {
-            polygon.labeledAngles = _.map(polygon.angleLabels, function(label) {
+            polygon.labeledAngles = _.times(Math.max(
+                        polygon.angleLabels.length,
+                        polygon.showRightAngleMarkers.length
+                    ), function() {
                 return this.label([0, 0], "", "center", polygon.labelStyle);
             }, this);
         }
@@ -1911,7 +2157,7 @@ $.extend(KhanUtil.Graphie.prototype, {
                     var offsetTop = (polygon.top - startY) * graphie.scale[1];
                     var offsetBottom = (startY - polygon.bottom) * graphie.scale[1];
 
-                    $(document).bind("vmousemove vmouseup", function(event) {
+                    $(document).bind("vmousemove.polygon vmouseup.polygon", function(event) {
                         event.preventDefault();
 
                         polygon.dragging = true;
@@ -1998,7 +2244,7 @@ $.extend(KhanUtil.Graphie.prototype, {
                             }
 
                         } else if (event.type === "vmouseup") {
-                            $(document).unbind("vmousemove vmouseup");
+                            $(document).unbind(".polygon");
 
                             var points = _.filter(polygon.points, isPoint);
                             _.each(points, function(point) {
@@ -2051,21 +2297,25 @@ $.extend(KhanUtil.Graphie.prototype, {
         var lower = this.unscalePoint([padding, this.ypixels - padding]);
         var upper = this.unscalePoint([this.xpixels - padding, padding]);
 
-        if (point[0] < lower[0]) {
-            return [lower[0], point[1] + (lower[0] - point[0]) * Math.tan(angle)];
-        } else if (point[0] > upper[0]) {
-            return [upper[0], point[1] - (point[0] - upper[0]) * Math.tan(angle)];
-        } else if (point[1] < lower[1]) {
-            return [point[0] + (lower[1] - point[1]) / Math.tan(angle), lower[1]];
-        } else if (point[1] > upper[1]) {
-            return [point[0] - (point[1] - upper[1]) / Math.tan(angle), upper[1]];
-        } else {
-            return point;
+        var result = point.slice();
+
+        if (result[0] < lower[0]) {
+            result = [lower[0], result[1] + (lower[0] - result[0]) * Math.tan(angle)];
+        } else if (result[0] > upper[0]) {
+            result = [upper[0], result[1] - (result[0] - upper[0]) * Math.tan(angle)];
         }
+
+        if (result[1] < lower[1]) {
+            result = [result[0] + (lower[1] - result[1]) / Math.tan(angle), lower[1]];
+        } else if (result[1] > upper[1]) {
+            result = [result[0] - (result[1] - upper[1]) / Math.tan(angle), upper[1]];
+        }
+
+        return result;
     },
 
     // MovableAngle is an angle that can be dragged around the screen.
-    // By attaching a smartPoint to the vertex and ray control points, the 
+    // By attaching a smartPoint to the vertex and ray control points, the
     // rays can be manipulated individually.
     //
     // Use only with smartPoints; add the smartPoints first, then:
@@ -2102,7 +2352,7 @@ $.extend(KhanUtil.Graphie.prototype, {
                     [arrowWidget.coord[0], arrowWidget.coord[1] + 4 / graph.scale[1]],
                     [arrowWidget.coord[0] + 4 / graph.scale[0], arrowWidget.coord[1] - 4 / graph.scale[1]],
                     [arrowWidget.coord[0], arrowWidget.coord[1] - 4 / graph.scale[1]]
-                    ], { stroke: "", fill: KhanUtil.ORANGE });
+                    ], { stroke: "", fill: KhanUtil.INTERACTIVE });
         } else if (arrowWidget.direction === "down") {
             arrowWidget.visibleShape = graph.path([
                     [arrowWidget.coord[0], arrowWidget.coord[1] + 4 / graph.scale[1]],
@@ -2110,7 +2360,7 @@ $.extend(KhanUtil.Graphie.prototype, {
                     [arrowWidget.coord[0], arrowWidget.coord[1] - 4 / graph.scale[1]],
                     [arrowWidget.coord[0] + 4 / graph.scale[0], arrowWidget.coord[1] + 4 / graph.scale[1]],
                     [arrowWidget.coord[0], arrowWidget.coord[1] + 4 / graph.scale[1]]
-                    ], { stroke: "", fill: KhanUtil.ORANGE });
+                    ], { stroke: "", fill: KhanUtil.INTERACTIVE });
         }
 
         // You might think we JUST NOW set the style when we drew this. But
@@ -2118,7 +2368,7 @@ $.extend(KhanUtil.Graphie.prototype, {
         // obnoxious. So apparently we have to set the style again, later, when
         // it's paying attention. Or something.
         _.defer(function() {
-            arrowWidget.visibleShape.attr({stroke: "", fill: KhanUtil.ORANGE});
+            arrowWidget.visibleShape.attr({stroke: "", fill: KhanUtil.INTERACTIVE});
         });
 
         arrowWidget.mouseTarget = graph.mouselayer.circle(
@@ -2128,9 +2378,9 @@ $.extend(KhanUtil.Graphie.prototype, {
         $(arrowWidget.mouseTarget[0]).css("cursor", "pointer");
         $(arrowWidget.mouseTarget[0]).bind("vmousedown vmouseover vmouseout", function(event) {
             if (event.type === "vmouseover") {
-                arrowWidget.visibleShape.animate({ scale: 2, fill: KhanUtil.ORANGE }, 20);
+                arrowWidget.visibleShape.animate({ scale: 2, fill: KhanUtil.INTERACTING }, 20);
             } else if (event.type === "vmouseout") {
-                arrowWidget.visibleShape.animate({ scale: 1, fill: KhanUtil.ORANGE }, 20);
+                arrowWidget.visibleShape.animate({ scale: 1, fill: KhanUtil.INTERACTING }, 20);
             } else if (event.type === "vmousedown" && (event.which === 1 || event.which === 0)) {
                 if (!arrowWidget.hidden) {
                     arrowWidget.onClick();
@@ -2164,34 +2414,34 @@ $.extend(KhanUtil.Graphie.prototype, {
             height: 1,
             normalStyle: {
                 points: {
-                    stroke: KhanUtil.BLUE,
-                    fill: KhanUtil.BLUE,
+                    stroke: KhanUtil.INTERACTIVE,
+                    fill: KhanUtil.INTERACTIVE,
                     opacity: 1
                 },
                 edges: {
-                    stroke: KhanUtil.BLUE,
+                    stroke: KhanUtil.INTERACTIVE,
                     opacity: 1,
                     "stroke-width": 1
                 },
                 area: {
-                    fill: KhanUtil.BLUE,
+                    fill: KhanUtil.INTERACTIVE,
                     "fill-opacity": 0.1,
                     "stroke-width": 0
                 }
             },
             hoverStyle: {
                 points: {
-                    color: KhanUtil.BLUE,
+                    color: KhanUtil.INTERACTING,
                     opacity: 1,
                     width: 2
                 },
                 edges: {
-                    stroke: KhanUtil.BLUE,
+                    stroke: KhanUtil.INTERACTING,
                     opacity: 1,
                     "stroke-width": 1
                 },
                 area: {
-                    fill: KhanUtil.BLUE,
+                    fill: KhanUtil.INTERACTING,
                     "fill-opacity": 0.2,
                     "stroke-width": 0
                 }
@@ -2635,24 +2885,31 @@ $.extend(KhanUtil.Graphie.prototype, {
             snapRadius: 0.5,
             minRadius: 1,
             centerConstraints: {},
-            centerNormalStyle: {
-                stroke: KhanUtil.BLUE,
-                fill: KhanUtil.BLUE
-            },
+            centerNormalStyle: {},
             centerHighlightStyle: {
-                stroke: KhanUtil.ORANGE,
-                fill: KhanUtil.ORANGE
+                stroke: KhanUtil.INTERACTING,
+                fill: KhanUtil.INTERACTING
             },
             circleNormalStyle: {
-                stroke: KhanUtil.BLUE,
+                stroke: KhanUtil.INTERACTIVE,
                 "fill-opacity": 0
             },
             circleHighlightStyle: {
-                stroke: KhanUtil.ORANGE,
-                fill: KhanUtil.ORANGE,
+                stroke: KhanUtil.INTERACTING,
+                fill: KhanUtil.INTERACTING,
                 "fill-opacity": 0.05
             }
         }, options);
+
+        // Set normal styling based on interactability
+        var normalColor = (circle.centerConstraints.fixed) ?
+                                  KhanUtil.DYNAMIC
+                                : KhanUtil.INTERACTIVE;
+        var centerNormalStyle = (options) ? options.centerNormalStyle : null;
+        circle.centerNormalStyle = _.extend({}, {
+            "fill": normalColor,
+            "stroke": normalColor
+        }, centerNormalStyle);
 
         circle.centerPoint = graphie.addMovablePoint({
             graph: graphie,
@@ -2674,9 +2931,10 @@ $.extend(KhanUtil.Graphie.prototype, {
 
         // Highlight circle circumference on center point hover
         if (!circle.centerConstraints.fixed) {
-            $(circle.centerPoint.mouseTarget[0]).on("vmouseover vmouseout",
+            $(circle.centerPoint.mouseTarget.getMouseTarget()).on("vmouseover vmouseout",
                     function(event) {
-                if (circle.centerPoint.highlight) {
+                if (circle.centerPoint.highlight ||
+                        circle.centerPoint.dragging) {
                     circle.circ.animate(circle.circleHighlightStyle, 50);
                 } else {
                     circle.circ.animate(circle.circleNormalStyle, 50);
@@ -2759,7 +3017,7 @@ $.extend(KhanUtil.Graphie.prototype, {
 
                 } else if (event.type === "vmouseout") {
                     circle.highlight = false;
-                    if (!circle.dragging) {
+                    if (!circle.dragging && !circle.centerPoint.dragging) {
                         circle.circ.animate(circle.circleNormalStyle, 50);
                         circle.centerPoint.visibleShape.animate(
                             circle.centerNormalStyle,
@@ -2818,9 +3076,82 @@ $.extend(KhanUtil.Graphie.prototype, {
         return circle;
     },
 
+    interactiveEllipse: function(options) {
+        var graphie = this;
+        var ellipse = $.extend({
+            center: [0, 0],
+            radius: 2,
+            xRadius: 2,
+            yRadius: 2,
+            ellipseNormalStyle: {
+                stroke: KhanUtil.BLUE,
+                "fill-opacity": 0
+            },
+            ellipseBoundaryHideStyle: {
+                "fill-opacity": 0,
+                "stroke-width": 0
+            },
+            ellipseBoundaryShowStyle: {
+                "fill-opacity": 1,
+                fill: KhanUtil.BLUE
+            },
+            onMove: function(coordX, coordY) { /* Here to be overriden */ },
+            onLeave: function(coordX, coordY) { /* Here to be overriden */ }
+        }, options);
+
+        ellipse.circ = graphie.ellipse(ellipse.center, [ellipse.xRadius, ellipse.yRadius], ellipse.ellipseNormalStyle);
+        ellipse.perim = graphie.mouselayer.ellipse(
+            graphie.scalePoint(ellipse.center)[0],
+            graphie.scalePoint(ellipse.center)[1],
+            graphie.scaleVector(ellipse.xRadius)[0],
+            graphie.scaleVector(ellipse.yRadius)[0]).attr({
+                "stroke-width": 30,
+                "opacity": 0.002  // This is as close to 0 as MSIE will allow
+        });
+
+        ellipse.boundaryPoint = graphie.circle(ellipse.center, 0.4, ellipse.ellipseBoundaryHideStyle);
+
+        ellipse.remove = function() {
+            ellipse.circ.remove();
+            ellipse.perim.remove();
+        };
+
+        ellipse.showPoint = function(event) {
+            // Fix to ellipse boundary by finding angle and adjusting the radius
+            var coord = graphie.constrainToBounds(graphie.getMouseCoord(event), 10);
+            var dx = ellipse.yRadius * (ellipse.center[0] - coord[0]);
+            var dy = ellipse.xRadius * (ellipse.center[1] - coord[1]);
+            var angle = Math.atan2(dy, dx);
+
+            coord[0] = ellipse.center[0] - ellipse.xRadius * Math.cos(angle);
+            coord[1] = ellipse.center[1] - ellipse.yRadius * Math.sin(angle);
+
+            var scaledPoint = graphie.scalePoint(coord);
+            ellipse.boundaryPoint.attr({ cx: scaledPoint[0] });
+            ellipse.boundaryPoint.attr({ cy: scaledPoint[1] });
+            ellipse.boundaryPoint.animate(ellipse.ellipseBoundaryShowStyle, 50);
+
+            ellipse.onMove(coord[0], coord[1]);
+        };
+
+        $(ellipse.perim[0]).on(
+            "vmouseover vmouseout vmousemove", function(event) {
+                if (event.type === "vmouseover") {
+                    ellipse.showPoint(event);
+                } else if (event.type === "vmouseout") {
+                    ellipse.boundaryPoint.animate(ellipse.ellipseBoundaryHideStyle, 50);
+                    ellipse.onLeave();
+                } else if (event.type === "vmousemove") {
+                    ellipse.showPoint(event);
+                }
+        });
+
+        return ellipse;
+    },
+
     addRotateHandle: (function() {
         var drawRotateHandle = function(graphie, center, radius, halfWidth,
-                angle) {
+                lengthAngle, angle, interacting) {
             // Get a point on the arrow, given an angle offset and a distance
             // from the "midline" of the arrow (ROTATE_HANDLE_DIST away from
             // the rotation point).
@@ -2844,33 +3175,38 @@ $.extend(KhanUtil.Graphie.prototype, {
             // click and drag to rotate
             return graphie.raphael.path(
                 // upper arrowhead
-                " M" + getRotateHandlePoint(30, -halfWidth) +
-                " L" + getRotateHandlePoint(30, -3 * halfWidth) +
-                " L" + getRotateHandlePoint(60, 0) +
-                " L" + getRotateHandlePoint(30, 3 * halfWidth) +
-                " L" + getRotateHandlePoint(30, halfWidth) +
+                " M" + getRotateHandlePoint(lengthAngle, -halfWidth) +
+                " L" + getRotateHandlePoint(lengthAngle, -3 * halfWidth) +
+                " L" + getRotateHandlePoint(2 * lengthAngle, 0) +
+                " L" + getRotateHandlePoint(lengthAngle, 3 * halfWidth) +
+                " L" + getRotateHandlePoint(lengthAngle, halfWidth) +
                 // outer arc
                 " A" + outerR[0] + "," + outerR[1] + ",0,0,1," +
-                    getRotateHandlePoint(-30, halfWidth) +
+                    getRotateHandlePoint(-lengthAngle, halfWidth) +
                 // lower arrowhead
-                " L" + getRotateHandlePoint(-30, 3 * halfWidth) +
-                " L" + getRotateHandlePoint(-60, 0) +
-                " L" + getRotateHandlePoint(-30, -3 * halfWidth) +
-                " L" + getRotateHandlePoint(-30, -halfWidth) +
+                " L" + getRotateHandlePoint(-lengthAngle, 3 * halfWidth) +
+                " L" + getRotateHandlePoint(-2 * lengthAngle, 0) +
+                " L" + getRotateHandlePoint(-lengthAngle, -3 * halfWidth) +
+                " L" + getRotateHandlePoint(-lengthAngle, -halfWidth) +
                 // inner arc
                 " A" + innerR[0] + "," + innerR[1] + ",0,0,0," +
-                    getRotateHandlePoint(30, -halfWidth) +
+                    getRotateHandlePoint(lengthAngle, -halfWidth) +
                 " Z"
             ).attr({
                 stroke: null,
-                fill: KhanUtil.ORANGE
+                fill: (interacting) ? KhanUtil.INTERACTING
+                                    : KhanUtil.INTERACTIVE
             });
         };
 
         return function(options) {
             var graph = this;
+
             var rotatePoint = options.center;
             var radius = options.radius;
+            var lengthAngle = options.lengthAngle || 30;
+            var hideArrow = options.hideArrow || false;
+            var mouseTarget = options.mouseTarget;
             var id = _.uniqueId("rotateHandle");
 
             // Normalize rotatePoint into something that always looks
@@ -2893,7 +3229,8 @@ $.extend(KhanUtil.Graphie.prototype, {
                         dist: radius,
                         point: rotatePoint
                     }
-                }
+                },
+                mouseTarget: mouseTarget
             });
 
             // move the rotatePoint in front of the rotateHandle to avoid
@@ -2911,13 +3248,19 @@ $.extend(KhanUtil.Graphie.prototype, {
             var drawnRotateHandle;
 
             var redrawRotateHandle = function(handleCoord) {
-                if (drawnRotateHandle) {
-                    drawnRotateHandle.remove();
+                if (hideArrow) {
+                    return; // Don't draw anything!
                 }
+
                 var handleVec = KhanUtil.kvector.subtract(handleCoord,
                         rotatePoint.coord);
                 var handlePolar = KhanUtil.kvector.polarDegFromCart(handleVec);
                 var angle = handlePolar[1];
+
+                if (drawnRotateHandle) {
+                    drawnRotateHandle.remove();
+                }
+
                 drawnRotateHandle = drawRotateHandle(
                     graph,
                     rotatePoint.coord,
@@ -2926,7 +3269,9 @@ $.extend(KhanUtil.Graphie.prototype, {
                         options.hoverWidth / 2 :
                         options.width / 2
                     ),
-                    angle
+                    lengthAngle,
+                    angle,
+                    isRotating || isHovering
                 );
             };
 
@@ -3014,19 +3359,23 @@ $.extend(KhanUtil.Graphie.prototype, {
                 }
             };
 
-            // Remove the default dot added by the movablePoint since we have our
-            // double-arrow thing
+            // Remove the default dot added by the movablePoint since we have
+            // our double-arrow thing
             rotateHandle.visibleShape.remove();
-            // Make the mouse target bigger to encompass the whole area around the
-            // double-arrow thing
-            rotateHandle.mouseTarget.attr({scale: 2});
+
+            if (!mouseTarget) {
+                // Make the default mouse target bigger to encompass the whole
+                // area around the double-arrow thing
+                rotateHandle.mouseTarget.attr({scale: 2});
+            }
 
             // Make the arrow-thing grow and shrink with mouseover/out
-            $(rotateHandle.mouseTarget[0]).bind("vmouseover", function(e) {
+            var $mouseTarget = $(rotateHandle.mouseTarget.getMouseTarget());
+            $mouseTarget.bind("vmouseover", function(e) {
                 isHovering = true;
                 redrawRotateHandle(rotateHandle.coord);
             });
-            $(rotateHandle.mouseTarget[0]).bind("vmouseout", function(e) {
+            $mouseTarget.bind("vmouseout", function(e) {
                 isHovering = false;
                 redrawRotateHandle(rotateHandle.coord);
             });
@@ -3036,8 +3385,14 @@ $.extend(KhanUtil.Graphie.prototype, {
             var oldRemove = rotateHandle.remove;
             rotateHandle.remove = function() {
                 oldRemove.call(rotateHandle);
-                drawnRotateHandle.remove();
+                if (drawnRotateHandle) {
+                    drawnRotateHandle.remove();
+                }
                 $(rotatePoint).off("move." + id);
+            };
+
+            rotateHandle.update = function() {
+                redrawRotateHandle(rotateHandle.coord);
             };
 
             return rotateHandle;
@@ -3045,41 +3400,6 @@ $.extend(KhanUtil.Graphie.prototype, {
     })(),
 
     addReflectButton: (function() {
-        var decorateOnMoves = function(movable, decorator) {
-            var prevOnMove = movable.onMove;
-            var prevOnMoveEnd = movable.onMoveEnd;
-
-            if (prevOnMove) {
-                movable.onMove = function(x, y) {
-                    var result = prevOnMove.apply(movable, _.toArray(arguments));
-                    if (_.isArray(result)) {
-                        x = result[0];
-                        y = result[1];
-                    } else if (result === false && movable.coord) {
-                        x = movable.coord[0];
-                        y = movable.coord[1];
-                    }
-                    decorator(x, y);
-                    return result;
-                };
-            } else {
-                movable.onMove = decorator;
-            }
-
-            if (prevOnMoveEnd) {
-                movable.onMoveEnd = function() {
-                    prevOnMoveEnd();
-                    if (movable.coord) {
-                        decorator(movable.coord[0], movable.coord[1]);
-                    } else {
-                        decorator();
-                    }
-                };
-            } else {
-                movable.onMoveEnd = decorator;
-            }
-        };
-
         var drawButton = function(
                 graphie,
                 buttonCoord,
@@ -3149,16 +3469,33 @@ $.extend(KhanUtil.Graphie.prototype, {
             var line = options.line;
 
             var button = graphie.addMovablePoint({
+                constraints: options.constraints,
                 coord: kline.midpoint([
                     line.pointA.coord,
                     line.pointZ.coord
                 ]),
-                onMove: function() { return false; }
+                snapX: graphie.snap[0],
+                snapY: graphie.snap[1],
+                onMove: function(x, y) {
+                    // Don't allow the button to actually move. This is a hack
+                    // around the inability to both set a point as fixed AND
+                    // allow it to be clicked.
+                    return false;
+                },
+                onMoveEnd: function(x, y) {
+                    if (options.onMoveEnd) {
+                        options.onMoveEnd.call(this, x, y);
+                    }
+                }
             });
 
             var isHovering = false;
             var isFlipped = false;
             var currentlyDrawnButton;
+
+            var isHighlight = function() {
+                return isHovering;
+            };
 
             var styles = _.map([0, 1], function(isHighlight) {
                 var baseStyle = isHighlight ?
@@ -3176,7 +3513,7 @@ $.extend(KhanUtil.Graphie.prototype, {
                 if (isFlipped) {
                     isRight = !isRight;
                 }
-                return styles[+isHovering][+isRight];
+                return styles[+isHighlight()][+isRight];
             };
 
             var redraw = function(coord, lineCoords) {
@@ -3187,8 +3524,8 @@ $.extend(KhanUtil.Graphie.prototype, {
                     graphie,
                     coord,
                     lineCoords,
-                    isHovering ? options.size * 1.5 : options.size,
-                    isHovering ? options.size * 0.125 : 0.25,
+                    isHighlight() ? options.size * 1.5 : options.size,
+                    isHighlight() ? options.size * 0.125 : 0.25,
                     getStyle(0),
                     getStyle(1)
                 );
@@ -3205,18 +3542,11 @@ $.extend(KhanUtil.Graphie.prototype, {
                 redraw(buttonCoord, [coordA, coordZ]);
             };
 
-            decorateOnMoves(line, _.bind(update, null, null, null));
-            decorateOnMoves(line.pointA, function(x, y) {
-                update([x, y], null);
-            });
-            decorateOnMoves(line.pointZ, function(x, y) {
-                update(null, [x, y]);
-            });
-
-            button.update = update;
+            $(line).on("move", _.bind(update, button, null, null));
 
             // Add click handling
-            $(button.mouseTarget[0]).on("vmousedown", function() {
+            var $mouseTarget = $(button.mouseTarget.getMouseTarget());
+            $mouseTarget.on("vclick", function() {
                 var result = options.onClick();
                 if (result !== false) {
                     isFlipped = !isFlipped;
@@ -3237,13 +3567,14 @@ $.extend(KhanUtil.Graphie.prototype, {
             // Resize the hidden point to cover the size of the visual point
             var pointScale = graphie.scaleVector(options.size)[0] / 20;
             button.mouseTarget.attr({scale: 1.5 * pointScale});
+            $mouseTarget.css("cursor", "pointer");
 
             // Make the arrow-thing grow and shrink with mouseover/out
-            $(button.mouseTarget[0]).bind("vmouseover", function(e) {
+            $mouseTarget.bind("vmouseover", function(e) {
                 isHovering = true;
                 redraw(button.coord, [line.pointA.coord, line.pointZ.coord]);
             });
-            $(button.mouseTarget[0]).bind("vmouseout", function(e) {
+            $mouseTarget.bind("vmouseout", function(e) {
                 isHovering = false;
                 redraw(button.coord, [line.pointA.coord, line.pointZ.coord]);
             });
@@ -3254,6 +3585,11 @@ $.extend(KhanUtil.Graphie.prototype, {
                 oldButtonRemove.call(button);
             };
 
+            button.update = update;
+            button.isFlipped = function() {
+                return isFlipped;
+            };
+
             update();
             return button;
         };
@@ -3261,6 +3597,10 @@ $.extend(KhanUtil.Graphie.prototype, {
 
     protractor: function(center) {
         return new Protractor(this, center);
+    },
+
+    ruler: function(options) {
+        return new Ruler(this, options || {});
     },
 
     addPoints: addPoints
@@ -3310,7 +3650,7 @@ function Protractor(graph, center) {
         " Z"
     ).attr({
         "stroke": null,
-        "fill": KhanUtil.ORANGE
+        "fill": KhanUtil.INTERACTIVE
     });
 
     // add it to the set so it translates with everything else
@@ -3343,13 +3683,39 @@ function Protractor(graph, center) {
     this.rotateHandle.mouseTarget.attr({ scale: 2.0 });
 
     // Make the arrow-thing grow and shrink with mouseover/out
-    $(this.rotateHandle.mouseTarget[0]).bind("vmouseover", function(event) {
-        arrow.animate({ scale: 1.5 }, 50);
-    });
-    $(this.rotateHandle.mouseTarget[0]).bind("vmouseout", function(event) {
-        arrow.animate({ scale: 1.0 }, 50);
+    var isDragging = false;
+    var isHovering = false;
+    var isHighlight = function() {
+        return isHovering || isDragging;
+    };
+
+    var self = this;
+    var $mouseTarget = $(self.rotateHandle.mouseTarget.getMouseTarget());
+    $mouseTarget.bind("vmousedown", function(event) {
+        isDragging = true;
+        arrow.animate({ scale: 1.5, fill: KhanUtil.INTERACTING }, 50);
+
+        $(document).bind("vmouseup.rotateHandle", function(event) {
+            isDragging = false;
+
+            if (!isHighlight()) {
+                arrow.animate({ scale: 1.0, fill: KhanUtil.INTERACTIVE }, 50);
+            }
+
+            $(document).unbind("vmouseup.rotateHandle");
+        });
     });
 
+    $mouseTarget.bind("vmouseover", function(event) {
+        isHovering = true;
+        arrow.animate({ scale: 1.5, fill: KhanUtil.INTERACTING }, 50);
+    });
+    $mouseTarget.bind("vmouseout", function(event) {
+        isHovering = false;
+        if (!isHighlight()) {
+            arrow.animate({ scale: 1.0, fill: KhanUtil.INTERACTIVE }, 50);
+        }
+    });
 
     var setNodes = $.map(this.set, function(el) { return el.node; });
     this.makeTranslatable = function makeTranslatable() {
@@ -3360,7 +3726,7 @@ function Protractor(graph, center) {
             var startx = event.pageX - $(graph.raphael.canvas.parentNode).offset().left;
             var starty = event.pageY - $(graph.raphael.canvas.parentNode).offset().top;
 
-            $(document).bind("vmousemove", function(event) {
+            $(document).bind("vmousemove.protractor", function(event) {
                 // mouse{X|Y} are in pixels relative to the SVG
                 var mouseX = event.pageX - $(graph.raphael.canvas.parentNode).offset().left;
                 var mouseY = event.pageY - $(graph.raphael.canvas.parentNode).offset().top;
@@ -3381,7 +3747,7 @@ function Protractor(graph, center) {
             });
 
             $(document).one("vmouseup", function(event) {
-                $(document).unbind("vmousemove");
+                $(document).unbind("vmousemove.protractor");
             });
         });
     };
@@ -3451,28 +3817,281 @@ function Protractor(graph, center) {
     return this;
 }
 
+function Ruler(graphie, options) {
+    _.defaults(options, {
+        center: [0, 0],
+        pixelsPerUnit: 40,
+        ticksPerUnit: 10,   // 10 or power of 2
+        units: 10,          // the length the ruler can measure
+        label: "",          // e.g "cm" (the shorter, the better)
+        style: {
+            fill: null,
+            stroke: KhanUtil.GRAY
+        }
+    });
+
+    var light = _.extend({}, options.style, {strokeWidth: 1});
+    var bold  = _.extend({}, options.style, {strokeWidth: 2});
+
+    // Ruler dimensions in pixels
+    var width = options.units * options.pixelsPerUnit;
+    var height = 50;        // arbitrary, but looks good
+
+    // Bottom left corner of the ruler in graphie units
+    var leftBottom = graphie.unscalePoint(
+        kvector.subtract(
+            graphie.scalePoint(options.center),
+            kvector.scale([width, -height], 0.5)
+        )
+    );
+
+    var graphieUnitsPerUnit = options.pixelsPerUnit / graphie.scale[0];
+    var graphieUnitsHeight = height / graphie.scale[0];
+
+    // Top right corner of the ruler in graphie units
+    var rightTop = kvector.add(
+        leftBottom,
+        [options.units * graphieUnitsPerUnit, graphieUnitsHeight]
+    );
+
+    var tickHeight = 1.0;   // percent of ruler height
+    var tickHeightMap;      // mapping of tick frequency to tick height
+                            // {n: h} means every n-th tick will have height h
+
+    if (options.ticksPerUnit === 10) {
+        // decimal, as on a centimeter ruler
+        tickHeightMap = {
+            10: tickHeight,
+            5:  tickHeight * 0.55,
+            1:  tickHeight * 0.35
+        };
+    } else {
+        // powers of 2, as on an inch ruler
+        var sizes = [1, 0.6, 0.45, 0.3];
+
+        tickHeightMap = {};
+        for (var i = options.ticksPerUnit; i >= 1; i /= 2) {
+            tickHeightMap[i] = tickHeight * (sizes.shift() || 0.2);
+        }
+    }
+
+    var tickFrequencies = _.keys(tickHeightMap).sort(function(a, b) {
+        return b - a;
+    });
+
+    function getTickHeight(i) {
+        for (var k = 0; k < tickFrequencies.length; k++) {
+            var key = tickFrequencies[k];
+            if (i % key === 0) {
+                return tickHeightMap[key];
+            }
+        }
+    }
+
+    // Draw the ruler
+    var left = leftBottom[0];
+    var bottom = leftBottom[1];
+    var right = rightTop[0];
+    var top = rightTop[1];
+
+    var numTicks = options.units * options.ticksPerUnit + 1;
+
+    var set = graphie.raphael.set();
+
+    var px = 1 / graphie.scale[0]; // one pixel
+    set.push(graphie.line([left - px, bottom], [right + px, bottom], bold));
+    set.push(graphie.line([left - px, top], [right + px, top], bold));
+
+    _.times(numTicks, function(i) {
+        var n = i / options.ticksPerUnit;
+        var x = left + n * graphieUnitsPerUnit;
+        var height = getTickHeight(i) * graphieUnitsHeight;
+
+        var style = (i === 0 || i === numTicks - 1) ? bold : light;
+        set.push(graphie.line([x, bottom], [x, bottom + height], style));
+
+        if (n % 1 === 0) {
+            // Graphie labels are difficult to rotate in IE8,
+            // so use raphael.text() instead
+            var coord = graphie.scalePoint([x, top]);
+            var text;
+            var offset;
+
+            if (n === 0) {
+                // Unit label
+                text = options.label;
+                offset = {
+                    mm: 13,
+                    cm: 11,
+                    m: 8,
+                    km: 11,
+                    in: 8,
+                    ft: 8,
+                    yd: 10,
+                    mi: 10
+                }[text] || (3 * text.toString().length);
+            } else {
+                // Tick label
+                text = n;
+                offset = -3 * (n.toString().length + 1);
+            }
+            var label = graphie.raphael.text(
+                coord[0] + offset,
+                coord[1] + 10,
+                text
+            );
+            label.attr({
+                "font-family": "KaTeX_Main",
+                "font-size": "12px",
+                "color": "#444"
+            });
+            set.push(label);
+        }
+    });
+
+    // Add a mouse target
+    var mouseTarget = graphie.mouselayer.path(KhanUtil.svgPath([
+        leftBottom, [left, top], rightTop, [right, bottom], /* closed */ true
+    ]));
+    mouseTarget.attr({
+        fill: "#000",
+        opacity: 0,
+        stroke: "#000",
+        "stroke-width": 2
+    });
+    set.push(mouseTarget);
+
+    var setNodes = $.map(set, function(el) { return el.node; });
+    $(setNodes).css("cursor", "move");
+
+    $(setNodes).bind("vmousedown", function(event) {
+        event.preventDefault();
+        var startx = event.pageX - $(graphie.raphael.canvas.parentNode).offset().left;
+        var starty = event.pageY - $(graphie.raphael.canvas.parentNode).offset().top;
+
+        $(document).bind("vmousemove.ruler", function(event) {
+            // mouse{X|Y} are in pixels relative to the SVG
+            var mouseX = event.pageX - $(graphie.raphael.canvas.parentNode).offset().left;
+            var mouseY = event.pageY - $(graphie.raphael.canvas.parentNode).offset().top;
+            // can't go beyond 10 pixels from the edge
+            mouseX = Math.max(10, Math.min(graphie.xpixels - 10, mouseX));
+            mouseY = Math.max(10, Math.min(graphie.ypixels - 10, mouseY));
+
+            var dx = mouseX - startx;
+            var dy = mouseY - starty;
+
+            set.translate(dx, dy);
+            leftBottomHandle.setCoord([leftBottomHandle.coord[0] + dx / graphie.scale[0], leftBottomHandle.coord[1] - dy / graphie.scale[1]]);
+            rightBottomHandle.setCoord([rightBottomHandle.coord[0] + dx / graphie.scale[0], rightBottomHandle.coord[1] - dy / graphie.scale[1]]);
+
+            startx = mouseX;
+            starty = mouseY;
+        });
+
+        $(document).one("vmouseup", function(event) {
+            $(document).unbind("vmousemove.ruler");
+        });
+    });
+
+    // Handles for rotation
+    var leftBottomHandle = graphie.addMovablePoint({
+        coord: leftBottom,
+        normalStyle: {
+            fill: KhanUtil.INTERACTIVE,
+            "fill-opacity": 0,
+            stroke: KhanUtil.INTERACTIVE
+        },
+        highlightStyle: {
+            fill: KhanUtil.INTERACTING,
+            "fill-opacity": 0.1,
+            stroke: KhanUtil.INTERACTING
+        },
+        pointSize: 6, // or 8 maybe?
+        onMove: function(x, y) {
+            var dy = rightBottomHandle.coord[1] - y;
+            var dx = rightBottomHandle.coord[0] - x;
+            var angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            var center = kvector.scale(kvector.add([x, y], rightBottomHandle.coord), 0.5);
+            var scaledCenter = graphie.scalePoint(center);
+            var oldCenter = kvector.scale(kvector.add(leftBottomHandle.coord, rightBottomHandle.coord), 0.5);
+            var scaledOldCenter = graphie.scalePoint(oldCenter);
+            var diff = kvector.subtract(scaledCenter, scaledOldCenter);
+            set.rotate(-angle, scaledOldCenter[0], scaledOldCenter[1]);
+            set.translate(diff[0], diff[1]);
+        }
+    });
+    var rightBottomHandle = graphie.addMovablePoint({
+        coord: [right, bottom],
+        normalStyle: {
+            fill: KhanUtil.INTERACTIVE,
+            "fill-opacity": 0,
+            stroke: KhanUtil.INTERACTIVE
+        },
+        highlightStyle: {
+            fill: KhanUtil.INTERACTING,
+            "fill-opacity": 0.1,
+            stroke: KhanUtil.INTERACTING
+        },
+        pointSize: 6, // or 8 maybe?
+        onMove: function(x, y) {
+            var dy = y - leftBottomHandle.coord[1];
+            var dx = x - leftBottomHandle.coord[0];
+            var angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            var center = kvector.scale(kvector.add([x, y], leftBottomHandle.coord), 0.5);
+            var scaledCenter = graphie.scalePoint(center);
+            var oldCenter = kvector.scale(kvector.add(leftBottomHandle.coord, rightBottomHandle.coord), 0.5);
+            var scaledOldCenter = graphie.scalePoint(oldCenter);
+            var diff = kvector.subtract(scaledCenter, scaledOldCenter);
+            set.rotate(-angle, scaledOldCenter[0], scaledOldCenter[1]);
+            set.translate(diff[0], diff[1]);
+        }
+    });
+
+    // Make each handle rotate the ruler about the other one
+    leftBottomHandle.constraints.fixedDistance.dist = width / graphie.scale[0];
+    leftBottomHandle.constraints.fixedDistance.point = rightBottomHandle;
+    rightBottomHandle.constraints.fixedDistance.dist = width / graphie.scale[0];
+    rightBottomHandle.constraints.fixedDistance.point = leftBottomHandle;
+
+    this.remove = function() {
+        set.remove();
+        leftBottomHandle.remove();
+        rightBottomHandle.remove();
+    };
+
+    return this;
+}
+
 function MovableAngle(graphie, options) {
     this.graphie = graphie;
 
     // TODO(alex): Move standard colors from math.js to somewhere else
     // so that they are available when this file is first parsed
-    _.extend(this, {
+    _.extend(this, options);
+    _.defaults(this, {
         normalStyle: {
-            "stroke": KhanUtil.BLUE,
+            "stroke": KhanUtil.INTERACTIVE,
             "stroke-width": 2,
-            "fill": KhanUtil.BLUE
+            "fill": KhanUtil.INTERACTIVE
         },
         highlightStyle: {
-            "stroke": KhanUtil.ORANGE,
+            "stroke": KhanUtil.INTERACTING,
             "stroke-width": 2,
-            "fill": KhanUtil.ORANGE
+            "fill": KhanUtil.INTERACTING
         },
         labelStyle: {
-            "stroke": KhanUtil.BLUE,
+            "stroke": KhanUtil.DYNAMIC,
             "stroke-width": 1,
-            "color": KhanUtil.BLUE
-        }
-    }, options);
+            "color": KhanUtil.DYNAMIC
+        },
+        angleStyle: {
+            "stroke": KhanUtil.DYNAMIC,
+            "stroke-width": 1,
+            "color": KhanUtil.DYNAMIC
+        },
+        allowReflex: true // not on MovableAngle.prototype so that
+                          // it is not overridden by undefined
+    });
 
     if (!this.points || this.points.length !== 3) {
         throw new Error("MovableAngle requires 3 points");
@@ -3495,7 +4114,11 @@ function MovableAngle(graphie, options) {
     }, this);
     this.coords = _.pluck(this.points, "coord");
     if (this.reflex == null) {
-        this.reflex = (this._getClockwiseAngle(this.coords) > 180);
+        if (this.allowReflex) {
+            this.reflex = (this._getClockwiseAngle(this.coords) > 180);
+        } else {
+            this.reflex = false;
+        }
     }
 
     this.rays = _.map([0, 2], function(i) {
@@ -3520,6 +4143,7 @@ function MovableAngle(graphie, options) {
 _.extend(MovableAngle.prototype, {
     points: [],
     snapDegrees: 0,
+    snapOffsetDeg: 0,
     angleLabel: "",
     numArcs: 1,
     pushOut: 0,
@@ -3573,6 +4197,7 @@ _.extend(MovableAngle.prototype, {
         };
 
         var snap = this.snapDegrees;
+        var snapOffset = this.snapOffsetDeg;
 
         // Drag ray control points to move each ray individually
         _.each([0, 2], function(i) {
@@ -3584,7 +4209,8 @@ _.extend(MovableAngle.prototype, {
                     return false;
                 } else if (snap) {
                     var angle = KhanUtil.findAngle(newPoint, vertex);
-                    angle = Math.round(angle / snap) * snap;
+                    angle = Math.round((angle - snapOffset) / snap) * snap +
+                            snapOffset;
                     var distance = KhanUtil.getDistance(newPoint, vertex);
                     return addPoints(vertex, graphie.polar(distance, angle));
                 } else {
@@ -3609,7 +4235,18 @@ _.extend(MovableAngle.prototype, {
             }, this);
             _.each(this.rays, function(ray) {
                 ray.visibleLine.animate(this.highlightStyle, 50);
+                ray.arrowStyle = _.extend({}, ray.arrowStyle, {
+                    "color": this.highlightStyle.stroke,
+                    "stroke": this.highlightStyle.stroke
+                });
             }, this);
+
+            this.angleStyle = _.extend({}, this.angleStyle, {
+                "color": this.highlightStyle.stroke,
+                "stroke": this.highlightStyle.stroke
+            });
+            this.update();
+
         }.bind(this);
 
         vertex.onUnhighlight = function() {
@@ -3617,8 +4254,19 @@ _.extend(MovableAngle.prototype, {
                 point.visibleShape.animate(this.normalStyle, 50);
             }, this);
             _.each(this.rays, function(ray) {
-                ray.visibleLine.animate(this.normalStyle, 50);
+                ray.visibleLine.animate(ray.normalStyle, 50);
+                ray.arrowStyle = _.extend({}, ray.arrowStyle, {
+                    "color": ray.normalStyle.stroke,
+                    "stroke": ray.normalStyle.stroke
+                });
             }, this);
+
+            this.angleStyle = _.extend({}, this.angleStyle, {
+                "color": KhanUtil.DYNAMIC,
+                "stroke": KhanUtil.DYNAMIC
+            });
+            this.update();
+
         }.bind(this);
     },
 
@@ -3669,14 +4317,16 @@ _.extend(MovableAngle.prototype, {
         var prevClockwiseReflexive = (prevAngle > 180);
         var clockwiseReflexive = (angle > 180);
 
-        if (shouldChangeReflexivity == null) {
-            shouldChangeReflexivity =
-                    (prevClockwiseReflexive !== clockwiseReflexive) &&
-                    (Math.abs(angle - prevAngle) < 180);
-        }
+        if (this.allowReflex) {
+            if (shouldChangeReflexivity == null) {
+                shouldChangeReflexivity =
+                        (prevClockwiseReflexive !== clockwiseReflexive) &&
+                        (Math.abs(angle - prevAngle) < 180);
+            }
 
-        if (shouldChangeReflexivity) {
-            this.reflex = !this.reflex;
+            if (shouldChangeReflexivity) {
+                this.reflex = !this.reflex;
+            }
         }
 
         _.invoke(this.temp, "remove");
@@ -3689,7 +4339,7 @@ _.extend(MovableAngle.prototype, {
             numArcs: this.numArcs,
             pushOut: this.pushOut,
             clockwise: this.reflex === clockwiseReflexive,
-            style: this.labelStyle
+            style: this.angleStyle
         });
     },
 
@@ -3700,4 +4350,4 @@ _.extend(MovableAngle.prototype, {
     }
 });
 
-})();
+});

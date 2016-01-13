@@ -1,3 +1,11 @@
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, indent, max-len, no-trailing-spaces, no-undef, no-unused-vars, prefer-template */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
+
+define(function(require) {
+
+require("../third_party/jquery.mobile.vmouse.js");
+
 $.extend(KhanUtil, {
     initUnitCircle: function(degrees) {
         var graph = KhanUtil.currentGraph;
@@ -386,18 +394,29 @@ $.extend(KhanUtil, {
     },
 
 
-    showCoordinates: function(angle) {
+    showCoordinates: function(angle, highlightCoord) {
         var graph = KhanUtil.currentGraph;
         if (graph.degrees) {
             angle *= (Math.PI / 180);
         }
 
-        var coordText = "(" + KhanUtil.roundTo(3, Math.cos(angle)) + ", " + KhanUtil.roundTo(3, Math.sin(angle)) + ")";
-
         graph.style({stroke: 0, fill: KhanUtil.BLUE}, function() {
             graph.circle([Math.cos(angle), Math.sin(angle)], 4 / graph.scale[0]);
         });
         graph.dragPoint.toFront();
+
+        var xCoord = KhanUtil.roundTo(3, Math.cos(angle));
+        var yCoord = KhanUtil.roundTo(3, Math.sin(angle));
+        
+        if (highlightCoord === 'x') {
+            xCoord = "\\pink{" + xCoord + "}";
+        }
+
+        if (highlightCoord === 'y') {
+            yCoord = "\\pink{" + yCoord + "}";
+        }
+
+        var coordText = "(" + xCoord + ", " + yCoord + ")";
 
         if (Math.floor(angle / Math.PI) % 2) {
             graph.coordLabel = graph.label([Math.cos(angle), Math.sin(angle)], coordText, "below");
@@ -406,5 +425,7 @@ $.extend(KhanUtil, {
         }
 
     }
+
+});
 
 });

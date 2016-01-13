@@ -1,11 +1,12 @@
-(function(KhanUtil) {
+/* TODO(csilvers): fix these lint errors (http://eslint.org/docs/rules): */
+/* eslint-disable comma-dangle, eqeqeq, indent, no-undef, space-infix-ops */
+/* To fix, remove an entry above, run ka-lint, and fix errors. */
 
-var kmatrix = KhanUtil.kmatrix;
-var kvector = KhanUtil.kvector;
-$.fn["graphie-3dLoad"] = function() {
-    kmatrix = KhanUtil.kmatrix;
-    kvector = KhanUtil.kvector;
-};
+define(function(require) {
+
+require("./graphie.js");
+var kmatrix = require("./kmatrix.js");
+var kvector = require("./kvector.js");
 
 $.extend(KhanUtil, {
     // make a 3d object, which holds the vertices,
@@ -363,4 +364,4 @@ $.extend(KhanUtil, {
     }
 });
 
-})(KhanUtil);
+});
